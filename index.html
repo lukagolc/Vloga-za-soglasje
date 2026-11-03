@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="sl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vloga za soglasje</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--fg:#1b1f24;--muted:#5d6670;--line:#dde1e6;--chip:#eef1f4;
+  --acc:#0b62c4;--acc-fg:#fff;--ok:#1a7f37;--warn:#9a6700;--err:#c62828;
+  --ok-bg:#e8f5ec;--warn-bg:#fff6dd;--err-bg:#fdecec;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131619;--card:#1c2025;--fg:#e6e9ed;--muted:#9aa4ae;--line:#2f353c;--chip:#262b31;
+  --acc:#4c9bf0;--acc-fg:#0b1118;--ok:#4cc46b;--warn:#e0b44a;--err:#ef6b6b;
+  --ok-bg:#16291c;--warn-bg:#2d2512;--err-bg:#331a1a;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header.top{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.brand{font-weight:650}
+nav{display:flex;gap:6px;margin-left:auto}
+main{max-width:1280px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px}
+h2{font-size:16px;margin:0 0 10px}
+h3{font-size:14px;margin:12px 0 6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr));gap:10px 14px}
+.editor{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.editor aside{position:sticky;top:64px}
+@media (max-width:1000px){.editor{grid-template-columns:minmax(0,1fr)}.editor aside{position:static}}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+label.f.wide{grid-column:1/-1}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+textarea{width:100%;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
+label.c{display:flex;gap:8px;align-items:center;font-size:14px}
+button,.btn{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--chip);color:var(--fg);border-radius:6px;padding:6px 11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--acc)}
+button.pri,.btn.pri{background:var(--acc);color:var(--acc-fg);border-color:var(--acc)}
+button.danger{color:var(--err)}
+button.sm,.btn.sm{padding:3px 8px;font-size:13px}
+button.on{outline:2px solid var(--acc)}
+button:disabled{opacity:.5;cursor:default}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td input,td select{width:100%}
+td input[type=checkbox]{width:auto}
+.tbl-wrap{overflow-x:auto}
+.tbl-wrap table.siroka{min-width:860px}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--chip)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:var(--chip);white-space:nowrap}
+.chk{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.chk li{padding:6px 9px;border-radius:6px}
+.chk .err{background:var(--err-bg);color:var(--err)}
+.chk .warn{background:var(--warn-bg);color:var(--warn)}
+.chk .ok{background:var(--ok-bg);color:var(--ok)}
+.big{font-size:26px;font-weight:700}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.banner{background:var(--err-bg);color:var(--err);padding:8px 16px;font-size:14px;border-bottom:1px solid var(--line)}
+.pril{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.pril:last-child{border-bottom:0}
+.pril .meta{grid-column:1/3;font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.bad{color:var(--err)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+#toast.show{opacity:1}
+.pv{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;padding:16px}
+.pv[hidden]{display:none}
+.pv-box{background:var(--card);border-radius:10px;flex:1;display:flex;flex-direction:column;gap:8px;padding:10px;max-width:1000px;margin:0 auto}
+.pv iframe{flex:1;width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+/* pomočnik za oddajo */
+.wiz{max-width:860px;margin:0 auto}
+.korak{padding:0;overflow:hidden}
+.korak > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:600}
+.korak > summary::-webkit-details-marker{display:none}
+.korak .num{width:26px;height:26px;border-radius:50%;background:var(--err);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.korak.done .num{background:var(--ok)}
+.korak .prog{margin-left:auto;font-weight:400;font-size:13px;color:var(--muted)}
+.vr{display:grid;grid-template-columns:24px minmax(0,220px) minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:7px 16px;border-top:1px solid var(--line)}
+.vr .lab{font-size:13px;color:var(--muted)}
+.vr .val{font-variant-numeric:tabular-nums;word-break:break-word}
+.vr .val .izb{font-weight:600}
+.vr .hint{grid-column:2/5;font-size:12px;color:var(--muted)}
+.vr.sub{background:var(--chip)}
+.vr.sub .lab{color:var(--fg);font-weight:600}
+.vr.ok .val{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.vr.miss .val{color:var(--err)}
+@media (max-width:640px){.vr{grid-template-columns:24px minmax(0,1fr) auto}.vr .lab{grid-column:2/4}.vr .val{grid-column:2/3}.vr .hint{grid-column:2/4}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Vloga za soglasje</div>
+  <nav>
+    <button data-act="view" data-v="list">Vloge</button>
+    <button data-act="view" data-v="settings">Nastavitve</button>
+  </nav>
+</header>
+<div id="banner"></div>
+<main id="app"></main>
+<div id="pv" class="pv" hidden><div class="pv-box">
+  <div class="row"><b id="pvTitle"></b><span style="margin-left:auto"></span>
+    <a id="pvOpen" class="btn sm" target="_blank" rel="noopener">Odpri v novem zavihku</a>
+    <button class="sm pri" data-act="pvDl">Prenesi</button><button class="sm" data-act="pvClose">Zapri</button></div>
+  <iframe id="pvFrame" title="Predogled dokumenta"></iframe>
+</div></div>
+<div id="toast"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="importKat" accept="application/json,.json" hidden>
+<script src="lib/pdf-lib.min.js"></script>
+<script src="lib/fontkit.umd.min.js"></script>
+<script src="lib/pisava.js"></script>
+<script>
+'use strict';
+
+/* ---------- pomožne funkcije ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const num = v => { const n = parseFloat(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+const fmtN = (n, d = 2) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString('sl-SI', { maximumFractionDigits: d, useGrouping: false });
+const fmtD = d => { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${+dd}. ${+m}. ${y}`; };
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const clone = o => JSON.parse(JSON.stringify(o));
+const slug = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+// Združi neprazne dele (false, null, 0 in prazni nizi se izpustijo).
+const join = (arr, sep = ', ') => arr.filter(Boolean).map(x => String(x).trim()).filter(Boolean).join(sep);
+const MB = 1024 * 1024;
+const fmtMB = b => b < 100 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${fmtN(b / MB, 1)} MB`;
+
+function toast(t) {
+  const el = $('#toast'); el.textContent = t; el.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function getPath(o, p) { return p.split('.').reduce((a, k) => a == null ? a : a[k], o); }
+function setPath(o, p, v) {
+  const ks = p.split('.'); let a = o;
+  ks.slice(0, -1).forEach(k => { if (a[k] == null) a[k] = {}; a = a[k]; });
+  a[ks[ks.length - 1]] = v;
+}
+function download(name, data, type) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+}
+// Kontrolna številka slovenske davčne številke (8 mest, uteži 8..2, mod 11).
+function davcnaOk(s) {
+  s = String(s || '').replace(/\D/g, '');
+  if (!/^[1-9]\d{7}$/.test(s)) return false;
+  let sum = 0; for (let i = 0; i < 7; i++) sum += +s[i] * (8 - i);
+  let k = 11 - (sum % 11); if (k === 10) k = 0; if (k === 11) return false;
+  return k === +s[7];
+}
+// GSRN merilnega mesta (18 mest): kontrolna števka po GS1 (uteži 3 in 1 od desne).
+function gs1Ok(s) {
+  s = String(s || '').replace(/\s/g, '');
+  if (!/^\d{18}$/.test(s)) return false;
+  let sum = 0; for (let i = 0; i < 17; i++) sum += +s[16 - i] * (i % 2 ? 1 : 3);
+  return (10 - sum % 10) % 10 === +s[17];
+}
+// »2230 Lenart« -> { st: '2230', kraj: 'Lenart' }
+const postaRaz = p => { const m = String(p || '').trim().match(/^(?:SI-)?(\d{4})\s*(.*)$/i); return m ? { st: m[1], kraj: m[2].trim() } : { st: '', kraj: String(p || '').trim() }; };
+
+/* ---------- spletni obrazec Elektro Maribor ---------- */
+const DIST = { ime: 'Elektro Maribor', kratko: 'EM' };
+const FORM_URL = 'https://mf-evloga.elektro-maribor.si/app/#/public/69d8ac978597050056b0ee9a/5a9d592cba67b9a200e1eff0';
+const MAX_DAT = 4 * MB; // največja velikost ene priloge na spletnem obrazcu
+// Možnosti so prepisane z uradne Enotne vloge EM (10/26). Če je besedilo na spletu drugačno, ga popravite tukaj.
+const OPC = {
+  shema: { 'PS.3A': 'PS.3A naprava za individualno samooskrbo', 'PS.3B': 'PS.3B naprava za skupnostno samooskrbo', 'PS.1B': 'PS.1B', 'PS.1C': 'PS.1C', 'PS.2': 'PS.2' },
+  obratovanje: { paralelno: 'Paralelno z DS', otocno: 'Otočno' },
+  nacin: { M: 'M – mešani (za svoje potrebe in oddajo)', P: 'P – porabniški (samo za svoje potrebe)' },
+  vir: { sonce: 'OVE – sonce', veter: 'OVE – veter', voda: 'OVE – voda' },
+  tehnologija: { LFP: 'LFP', NMC: 'NMC', NCA: 'NCA', LTO: 'LTO', drugo: 'Drugo' },
+  faze: { '3f': '3f', '1f': '1f' }
+};
+const STATUS = {
+  priprava: 'V pripravi', podpis: 'Pooblastilo pri stranki', oddano: 'Oddano', dopolnitev: 'Poziv za dopolnitev',
+  izdano: 'Soglasje izdano', zavrnjeno: 'Zavrnjeno'
+};
+// Priloge, ki jih dodate v orodje (ostanejo le do zaprtja strani).
+const PRILOGE = {
+  pooblastilo: { n: 'Podpisano pooblastilo investitorja', opis: 'Sken ali fotografija pooblastila, ki ga je podpisala stranka.' },
+  enopolna: { n: 'Enopolna shema', opis: 'Shema naprave z vrisano točko priključitve v interno NN omrežje (PDF ali slika). Doda se v tehnično dokumentacijo.' },
+  listi: { n: 'Tehnični listi opreme', opis: 'FN moduli, razsmerniki, hranilnik (PDF ali slike). Dodajo se v tehnično dokumentacijo.' },
+  kataster: { n: 'Kopija katastrskega načrta in zazidalna situacija', opis: 'Neobvezno (npr. izpis iz GURS ali iObčine).' },
+  ostalo: { n: 'Ostala dokazila', opis: 'Neobvezno: dokazilo o lastništvu, če objekt ni vpisan v zemljiško knjigo, najemna pogodba, soglasje solastnikov …' }
+};
+
+/* ---------- privzete nastavitve ---------- */
+const DEFAULTS = {
+  izvajalec: {
+    naziv: 'ENSET d.o.o.', ulica: 'Kraigherjeva', hs: '22', kraj: '', posta: '2230 Lenart', davcna: '55426310', maticna: '9304207000',
+    zastopnik: 'Jure Hundrič', kontakt: '', tel: '', email: '', podpis: ''
+  },
+  rules: {
+    kontaktNas: true,     // kontaktna oseba v vlogi smo mi (na naš e-naslov pride potrdilo in številka vloge)
+    letniDonos: 1100,     // kWh na kWp za oceno letne proizvodnje
+    delezLastne: 40,      // % proizvodnje, ki se porabi doma (ocena)
+    decimalka: ',',       // decimalno ločilo pri kopiranju števil
+    dodatniPodatki: '',   // izbira v polju »Dodatni podatki potrebni za izdajo soglasja« (Pričetek), če je vedno ista
+    vrstaNaprave: 'naprava za individualno samooskrbo',
+    nazivNaprave: 'Sončna elektrarna'
+  },
+  katalog: { razsmerniki: [], hranilniki: [] },
+  templates: {
+    pooblastilo: {
+      ime: 'Stranki – pooblastilo za podpis',
+      zadeva: 'Sončna elektrarna – pooblastilo za vlogo za soglasje',
+      telo:
+`Pozdravljeni,
+
+za vašo sončno elektrarno bomo pri {{distributer}} oddali vlogo za izdajo soglasja za priključitev. Vlogo oddamo mi, v vašem imenu.
+
+V priponki je pooblastilo. Prosimo, da ga podpišete in nam vrnete (sken ali fotografija).{{blok_solastniki}}
+
+{{blok_manjka}}
+
+Lep pozdrav,
+{{podpis}}`
+    },
+    oddano: {
+      ime: 'Stranki – vloga oddana',
+      zadeva: 'Vloga za soglasje je oddana – {{uporabnik}}',
+      telo:
+`Pozdravljeni,
+
+vlogo za izdajo soglasja za priključitev smo oddali pri {{distributer}}{{st_vloge}}.
+
+Naprava: {{naprava}}
+Merilno mesto: {{mm}}, {{lokacija}}
+
+Ko prejmemo soglasje, vas obvestimo.
+
+Lep pozdrav,
+{{podpis}}`
+    }
+  }
+};
+
+function merge(def, val) {
+  if (Array.isArray(def)) return Array.isArray(val) ? val : clone(def);
+  if (def && typeof def === 'object') {
+    const out = {};
+    for (const k of Object.keys(def)) out[k] = merge(def[k], val ? val[k] : undefined);
+    if (val && typeof val === 'object') for (const k of Object.keys(val)) if (!(k in out)) out[k] = val[k];
+    return out;
+  }
+  return val === undefined ? def : val;
+}
+
+/* ---------- shramba ---------- */
+const LS_CASES = 'vs.vloge.v1', LS_SET = 'vs.nastavitve.v1';
+function lsGet(k) { try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function lsSet(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch (e) { toast('Shranjevanje v brskalnik ni uspelo – naredite izvoz (varnostno kopijo).'); return false; }
+}
+let S = merge(DEFAULTS, lsGet(LS_SET));
+let CASES = lsGet(LS_CASES) || [];
+const FILES = {}; // caseId -> { kljucPriloge: [File] } – samo v tej seji
+let state = { view: 'list', id: null, tpl: null };
+let saveT;
+const saveCases = () => { clearTimeout(saveT); saveT = setTimeout(() => lsSet(LS_CASES, CASES), 250); };
+const saveSettings = () => lsSet(LS_SET, S);
+
+const newRs = () => ({ proizvajalec: '', model: '', kva: '', kos: 1, faze: '3f', napetost: '', sodo: false });
+const newHee = () => ({ proizvajalec: '', model: '', tehnologija: 'LFP', kwh: '', kwP: '', kwO: '', kos: 1, faze: '3f', napetost: '', sodo: false });
+function newCase() {
+  return {
+    id: uid(), created: today(), updated: today(), status: 'priprava',
+    vrste: { d: true, f: false },
+    im: { tip: 'fo', ime: '', priimek: '', naziv: '', ulica: '', hs: '', kraj: '', posta: '', davcna: '', zavezanec: false, solastniki: false, solastnikiImena: '', tel: '', email: '' },
+    plTretja: false,
+    mm: { obstojece: true, st: '4-', gsrn: '', pmOdjem: '', enako: true, ulica: '', hs: '', kraj: '', posta: '', ko: '', parcele: '', vecKo: false, leto: String(new Date().getFullYear()), predhodna: '' },
+    el: { naziv: '', vir: 'sonce', panelModel: '', panelKos: '', panelWp: '', pmObstojeca: '0', pmNova: '', shema: 'PS.3A', obratovanje: 'paralelno', nacin: 'M', sistemske: false, letno: '', lastne: '' },
+    rs: [newRs()],
+    hr: { shema: 'PS.3A', obratovanje: 'paralelno', nacin: 'M', sistemske: false, predhodnoSzp: '' },
+    hee: [],
+    opombe: '', opombeRocno: false,
+    oddaja: { st: '', datum: '', szp: '', szpDatum: '', szpPm: '' },
+    done: {}
+  };
+}
+const cur = () => CASES.find(c => c.id === state.id);
+CASES = CASES.map(c => merge(newCase(), c));
+
+/* ---------- izračuni ---------- */
+const R = () => S.rules;
+const uporabnik = c => c.im.tip === 'po' ? (c.im.naziv || '') : join([c.im.ime, c.im.priimek], ' ');
+const naslov = (o) => join([join([o.ulica, o.hs], ' '), o.posta]);
+const lok = c => c.mm.enako ? c.im : c.mm;
+const lokacija = c => naslov(lok(c));
+const kos = x => Math.max(1, Math.round(num(x.kos) || 1));
+const napetost = x => num(x.napetost) || (x.faze === '1f' ? 230 : 400);
+function moci(c) {
+  const rs = c.rs.filter(r => r.model || num(r.kva)), hee = c.vrste.f ? c.hee.filter(h => h.model || num(h.kwh)) : [];
+  const kva = rs.reduce((a, r) => a + num(r.kva) * kos(r), 0);
+  const kwp = num(c.el.panelKos) * num(c.el.panelWp) / 1000;
+  const heeKwh = hee.reduce((a, h) => a + num(h.kwh) * kos(h), 0);
+  const heeP = hee.reduce((a, h) => a + num(h.kwP) * kos(h), 0);
+  const heeO = hee.reduce((a, h) => a + num(h.kwO || h.kwP) * kos(h), 0);
+  const letno = num(c.el.letno), lastne = Math.min(num(c.el.lastne), letno);
+  return { rs, hee, kva, kwp, heeKwh, heeP, heeO, letno, lastne, oddaja: Math.max(0, letno - lastne) };
+}
+const ocenaLetno = c => Math.round(moci(c).kwp * num(R().letniDonos));
+const ocenaLastne = c => Math.round(num(c.el.letno || ocenaLetno(c)) * num(R().delezLastne) / 100);
+function napravaTxt(c) {
+  const m = moci(c);
+  return join([
+    'sončna elektrarna' + (m.kwp ? ` ${fmtN(m.kwp)} kWp` : ''),
+    m.rs.length ? 'razsmernik ' + m.rs.map(r => `${kos(r) > 1 ? kos(r) + ' × ' : ''}${join([r.proizvajalec, r.model], ' ')}`).join(' + ') + (m.kva ? ` (${fmtN(m.kva)} kVA)` : '') : '',
+    m.hee.length ? `hranilnik ${m.hee.map(h => `${kos(h) > 1 ? kos(h) + ' × ' : ''}${join([h.proizvajalec, h.model], ' ')}`).join(' + ')}${m.heeKwh ? ` (${fmtN(m.heeKwh)} kWh)` : ''}` : ''
+  ]);
+}
+function opombeAuto(c) {
+  const m = moci(c), iz = S.izvajalec;
+  return join([
+    `Naprava za individualno samooskrbo (${c.el.shema}): ${napravaTxt(c)}.`,
+    `Vlogo oddaja pooblaščenec ${iz.naziv}${join([iz.kontakt, iz.tel, iz.email]) ? ` (${join([iz.kontakt, iz.tel, iz.email])})` : ''}.`
+  ], ' ');
+}
+const opombe = c => c.opombeRocno ? c.opombe : opombeAuto(c);
+// Število za kopiranje v spletni obrazec.
+const cn = (v, d = 2) => { if (v === '' || v == null) return ''; const s = fmtN(num(v), d); return R().decimalka === '.' ? s.replace(',', '.') : s; };
+const cz = (v, d) => num(v) ? cn(v, d) : ''; // prazno namesto 0
+const fileBase = c => slug(c.im.tip === 'po' ? c.im.naziv : c.im.priimek || uporabnik(c)) || 'vloga';
+const fs = c => FILES[c.id] || {};
+
+/* ---------- kontrole ---------- */
+function checks(c) {
+  const out = [], e = t => out.push(['err', t]), w = t => out.push(['warn', t]);
+  const m = moci(c), im = c.im, mm = c.mm, L = lok(c), f = fs(c), iz = S.izvajalec;
+  if (!c.vrste.d && !c.vrste.f) e('Izberite vrsto vloge (elektrarna in/ali hranilnik).');
+  if (im.tip === 'po') { if (!im.naziv) e('Manjka naziv uporabnika.'); }
+  else if (!im.ime || !im.priimek) e('Manjka ime ali priimek uporabnika.');
+  if (!im.ulica || !im.hs) e('Manjka naslov uporabnika (ulica in hišna številka).');
+  if (!postaRaz(im.posta).st) e('Pošta uporabnika: vpišite poštno številko in kraj (npr. 2230 Lenart).');
+  if (!im.davcna) e('Manjka davčna številka uporabnika (na spletnem obrazcu je obvezna).');
+  else if (!davcnaOk(im.davcna)) e('Davčna številka uporabnika ni veljavna.');
+  if (im.solastniki && !im.solastnikiImena.trim()) w('Nepremičnina ima več solastnikov – vpišite jih, da se na pooblastilo dodajo mesta za njihove podpise.');
+  if (R().kontaktNas) { if (!iz.tel || !iz.email) e('V nastavitvah vpišite telefon in e-pošto (kontaktni podatki v vlogi).'); }
+  else if (!im.tel || !im.email) e('Manjka telefon ali e-pošta uporabnika (kontaktni podatki v vlogi).');
+  if (!iz.naziv || !iz.ulica || !iz.hs || !postaRaz(iz.posta).st) e('V nastavitvah dopolnite naziv in naslov pooblaščenca.');
+  if (!davcnaOk(iz.davcna)) e('V nastavitvah vpišite veljavno davčno številko pooblaščenca.');
+  if (!mm.obstojece) w('Novo merilno mesto: spletni obrazec bo zahteval še vlogo za odjemalca (prvi zavihek) – tega orodje ne pripravi.');
+  else if (!/^4-\d+$/.test(mm.st.replace(/\s/g, ''))) e('Številka merilnega mesta mora biti oblike 4-… (z računa za elektriko).');
+  if (mm.gsrn && !gs1Ok(mm.gsrn)) e('GSRN merilnega mesta ni veljaven (18 števk, kontrolna števka se ne ujema).');
+  if (!mm.enako && (!mm.ulica || !mm.hs || !postaRaz(mm.posta).st)) e('Manjka naslov lokacije naprave.');
+  if (!mm.ko) e('Manjka katastrska občina.');
+  if (!mm.parcele) e('Manjka parcelna številka.');
+  if (!num(mm.pmOdjem)) w('Vpišite priključno moč odjema merilnega mesta (kW) – z računa ali iz soglasja (npr. 17 kW pri 3 × 25 A).');
+  if (c.vrste.d) {
+    if (!m.rs.length) e('Vpišite razsmernik.');
+    m.rs.forEach((r, i) => { if (!num(r.kva)) e(`Razsmernik ${i + 1}: manjka moč (kVA).`); });
+    if (!m.kwp) w('Vpišite FN module (število in moč) – moč FN modulov je na obrazcu.');
+    if (!num(c.el.pmNova)) e('Vpišite novo priključno moč proizvodne naprave (kW).');
+    if (num(mm.pmOdjem) && m.kva > num(mm.pmOdjem)) e(`Moč razsmernikov (${fmtN(m.kva)} kVA) presega priključno moč odjema (${fmtN(num(mm.pmOdjem))} kW) – naprava za samooskrbo je ne sme.`);
+    if (num(mm.pmOdjem) && num(c.el.pmNova) > num(mm.pmOdjem)) e(`Nova priključna moč (${cn(c.el.pmNova)} kW) presega priključno moč odjema (${fmtN(num(mm.pmOdjem))} kW).`);
+    if (m.kva && num(c.el.pmNova) > m.kva + 0.01) w('Nova priključna moč je večja od moči razsmernikov – preverite.');
+    if (!m.letno) w('Vpišite predvideno letno proizvodnjo (gumb ≈ jo oceni).');
+    else if (!num(c.el.lastne)) w('Vpišite predvideno letno proizvodnjo za lastne potrebe.');
+    if (m.kwp && m.kva && m.kwp / m.kva > 1.5) w(`Razmerje FN moduli / razsmernik je ${fmtN(m.kwp / m.kva, 2)} – preverite podatke.`);
+  }
+  if (c.vrste.f) {
+    if (!m.hee.length) e('Vpišite hranilnik.');
+    m.hee.forEach((h, i) => {
+      if (!num(h.kwh)) e(`Hranilnik ${i + 1}: manjka kapaciteta (kWh).`);
+      if (!num(h.kwP)) e(`Hranilnik ${i + 1}: manjka moč polnjenja (kW).`);
+    });
+    if (new Set(m.hee.map(h => h.tehnologija)).size > 1) w('Hranilniki imajo različne tehnologije – na obrazcu je ena izbira.');
+    if (new Set(m.hee.map(h => h.faze)).size > 1) w('Hranilniki imajo različno število faz – na obrazcu je ena izbira.');
+    if (!num(mm.pmOdjem)) e('Hranilnik: obrazec zahteva priključno moč (kW) – vpišite priključno moč odjema merilnega mesta.');
+  }
+  if (!(f.pooblastilo || []).length) w('Podpisano pooblastilo še ni dodano (obvezna priloga).');
+  if (!(f.enopolna || []).length) w('Enopolna shema še ni dodana (del tehnične dokumentacije).');
+  if (!(f.listi || []).length) w('Tehnični listi opreme še niso dodani.');
+  for (const [k, list] of Object.entries(f)) for (const x of list) {
+    if (['pooblastilo', 'kataster', 'ostalo'].includes(k) && x.size > MAX_DAT) e(`»${x.name}« ima ${fmtMB(x.size)} – spletni obrazec sprejme največ 4 MB.`);
+  }
+  if (TEHDOC[c.id] && TEHDOC[c.id].size > MAX_DAT) e(`Tehnična dokumentacija ima ${fmtMB(TEHDOC[c.id].size)} (največ 4 MB) – zmanjšajte tehnične liste ali jih dajte med ostala dokazila.`);
+  if (!out.some(x => x[0] === 'err')) out.push(['ok', out.length ? 'Ni blokirajočih napak.' : 'Vse je pripravljeno za oddajo.']);
+  return out;
+}
+
+/* ---------- pomočnik za oddajo: koraki spletnega obrazca ---------- */
+// Vrstica: { l: oznaka na obrazcu, v: vrednost za kopiranje } ali { l, izb: izbira } ali { l, dat: [...] } ali { sub: naslov } ali { info }.
+// r: obvezno polje (rdeče, če manjka); h: namig.
+function koraki(c) {
+  const m = moci(c), im = c.im, mm = c.mm, iz = S.izvajalec, L = lok(c), PO = im.tip === 'po', f = fs(c);
+  const ps = postaRaz(im.posta), psIz = postaRaz(iz.posta), psL = postaRaz(L.posta);
+  const kontakt = R().kontaktNas ? { o: iz.kontakt || iz.zastopnik, t: iz.tel, e: iz.email } : { o: uporabnik(c), t: im.tel, e: im.email };
+  const mmSt = mm.st.replace(/\s/g, '').replace(/^4-/, '');
+  const datRow = (l, keys, h, r) => ({ l, dat: keys.flatMap(k => (f[k] || []).map(x => x.name)), r, h });
+  const tehRow = l => ({ l, teh: true, r: true, h: 'Prenesite PDF tehnične dokumentacije in ga naložite v to polje.' });
+  const out = [];
+
+  out.push({ n: 'Pričetek', v: [
+    { sub: 'Osnovni podatki' },
+    { l: 'Oddaje enotne vloge za', izb: join([c.vrste.d && '4. … proizvodne naprave EE / naprave za individualno samooskrbo …', c.vrste.f && '6. … za hranilnik električne energije'], ' in '), h: 'Obe možnosti lahko obkljukate hkrati.', r: true },
+    { l: 'Dodatni podatki potrebni za izdajo soglasja', izb: R().dodatniPodatki || '', r: true, h: R().dodatniPodatki ? '' : 'Izberite ustrezno možnost. Če je vedno ista, jo vpišite v Nastavitve → Pravila.' },
+    { sub: 'Uporabnik ali pooblaščenec' },
+    { l: 'Vaša vloga', izb: 'Sem pooblaščenec – vlogo oddajam za drugega uporabnika' }
+  ] });
+
+  const u = [
+    { sub: 'Podatki o uporabniku' },
+    { l: 'Vrsta uporabnika', izb: PO ? 'Pravni subjekt' : 'Fizična oseba' },
+    { l: 'Ali ima nepremičnina več solastnikov', izb: im.solastniki ? 'Da' : 'Ne', h: im.solastniki ? 'Pooblastilo ima mesta za podpise solastnikov.' : '' },
+    ...(PO ? [{ l: 'Naziv', v: im.naziv, r: true, h: 'Polja za pravni subjekt preverite na obrazcu.' }] : [{ l: 'Priimek', v: im.priimek, r: true }, { l: 'Ime', v: im.ime, r: true }]),
+    { l: 'Kraj', v: im.kraj, h: 'Neobvezno – naselje, če je drugačno od pošte.' },
+    { l: 'Naslov (ulica/naselje)', v: im.ulica, r: true },
+    { l: 'Hišna številka', v: im.hs, r: true },
+    { l: 'Pošta', v: ps.st, r: true, h: ps.st ? `Iskalnik: vtipkajte ${ps.st} in izberite »${join([ps.st, ps.kraj], ' ')}«.` : '' },
+    { l: 'Davčna številka', v: String(im.davcna || '').replace(/\D/g, ''), r: true },
+    ...(PO ? [{ l: 'Davčni zavezanec', izb: im.zavezanec ? 'Da' : 'Ne', h: 'Če se pojavi.' }] : []),
+    { sub: 'Podatki o pooblaščencu' },
+    { l: 'Vrsta pooblaščenca', izb: 'Pravni subjekt' },
+    { l: 'Naziv', v: iz.naziv, r: true },
+    { l: 'Kraj', v: iz.kraj },
+    { l: 'Naslov (ulica/naselje)', v: iz.ulica, r: true },
+    { l: 'Hišna številka', v: iz.hs, r: true },
+    { l: 'Pošta', v: psIz.st, r: true, h: psIz.st ? `Iskalnik: vtipkajte ${psIz.st} in izberite »${join([psIz.st, psIz.kraj], ' ')}«.` : '' },
+    { l: 'Davčna številka', v: iz.davcna, r: true },
+    { sub: 'Kontaktni podatki' },
+    { l: 'Podatki o kontaktni osebi so enaki podatkom o uporabniku', izb: R().kontaktNas ? 'izklopljeno' : 'vklopljeno', h: R().kontaktNas ? 'Kontakt smo mi – potrdilo in številka vloge prideta na naš e-naslov.' : '' },
+    ...(R().kontaktNas ? [{ l: 'Kontaktna oseba', v: kontakt.o, r: true }, { l: 'Telefon', v: kontakt.t, r: true }, { l: 'E-mail', v: kontakt.e, r: true }] : []),
+    { sub: 'Priloge' },
+    datRow('Pooblastilo investitorja', ['pooblastilo'], 'Podpisano pooblastilo (največ 4 MB).', true)
+  ];
+  out.push({ n: 'Podatki o uporabniku', v: u });
+
+  out.push({ n: 'Podatki o plačniku stroškov priključevanja', v: [
+    { l: 'Plačnik stroškov priključevanja', izb: c.plTretja ? 'Plačnik stroškov bo tretja oseba' : 'Plačnik stroškov bo uporabnik', h: c.plTretja ? 'Podatke plačnika vpišite ročno.' : '' }
+  ] });
+
+  const lokVrst = (gumb) => c.mm.enako
+    ? [{ l: gumb, izb: 'kliknite (Kopiraj/Prenesi)', h: 'Lokacija je na naslovu uporabnika.' }]
+    : [{ l: 'Kraj', v: L.kraj }, { l: 'Naslov (ulica/naselje)', v: L.ulica, r: true }, { l: 'Hišna številka', v: L.hs, r: true },
+       { l: 'Pošta', v: psL.st, r: true, h: psL.st ? `Iskalnik: vtipkajte ${psL.st} in izberite »${join([psL.st, psL.kraj], ' ')}«.` : '' }];
+  const mmVrst = [
+    { l: 'Sprememba na obstoječem merilnem mestu', izb: mm.obstojece ? 'vklopljeno' : 'izklopljeno', h: mm.obstojece ? '' : 'Obrazec bo opozoril, da je treba izpolniti še vlogo za odjemalca.' },
+    ...(mm.obstojece ? [
+      { l: 'Številka merilnega mesta', v: mmSt, r: true, h: 'Polje že vsebuje »4-«, zato se kopira samo ostanek.' },
+      { l: 'GSRN MM', v: mm.gsrn.replace(/\s/g, ''), h: 'Neobvezno – izpolnite, če obstaja.' }] : [])
+  ];
+
+  if (c.vrste.d) {
+    const el = c.el;
+    out.push({ n: 'Podatki o elektrarni oz. proizvodni napravi', v: [
+      ...mmVrst,
+      { l: 'Naziv elektrarne oz. proizvodne naprave', v: el.naziv || R().nazivNaprave, r: true },
+      { l: 'Številka predhodno izdane informacije o možnosti priključitve ali soglasja', v: mm.predhodna, h: 'Neobvezno – npr. informacija iz portala Moj Elektro.' },
+      { l: 'Vrsta proizvodne naprave', izb: R().vrstaNaprave, r: true, h: 'Izberite to ali najbližjo možnost.' },
+      { l: 'Proizvodni vir energije', izb: OPC.vir[el.vir], r: true },
+      { l: 'Moč fotonapetostnih modulov (kW)', v: cz(m.kwp, 3), h: 'Polje se pojavi po izbiri vira »sonce«.' },
+      ...lokVrst('Podatki o lokaciji so enaki uporabnikovemu naslovu'),
+      { l: 'Katastrska občina', v: mm.ko, r: true, h: 'Iskalnik: vtipkajte ime ali številko KO in izberite.' },
+      { l: 'Parcelna številka', v: mm.parcele, r: true, h: 'Več parcel ločite z vejico.' },
+      { l: 'Objekt se nahaja v več kot eni katastrski občini', izb: mm.vecKo ? 'vklopljeno' : 'izklopljeno' },
+      { l: 'Predvideno leto priključitve', izb: mm.leto, r: true },
+      { sub: 'Priključna moč proizvodne naprave' },
+      { l: 'Obstoječa (kW)', v: cn(el.pmObstojeca || 0), r: true },
+      { l: 'Nova (kW)', v: cz(el.pmNova), r: true },
+      { l: 'Celotna instalirana moč proizvodne naprave (kVA)', v: cz(m.kva), r: true },
+      { sub: 'Tehnični podatki' },
+      { l: 'Način vključevanja v DS tipska shema', izb: OPC.shema[el.shema], r: true },
+      { l: 'Način obratovanja', izb: join([OPC.obratovanje[el.obratovanje], OPC.nacin[el.nacin]], ' · '), r: true, h: 'Če seznam dovoli samo eno izbiro, izberite »Paralelno z DS«.' },
+      { l: 'Na voljo za sistemske storitve', izb: el.sistemske ? 'Da' : 'Ne' },
+      ...m.rs.flatMap((r, i) => [
+        { sub: `Razsmernik ${m.rs.length > 1 ? i + 1 + ' ' : ''}– gumb »Dodaj« (${join([r.proizvajalec, r.model], ' ')})` },
+        { l: 'Generator / Razsmernik', izb: 'Razsmernik' },
+        { l: 'Število enakih enot', v: String(kos(r)), r: true },
+        { l: 'Moč enote (kVA)', v: cz(r.kva), r: true },
+        { l: 'Nazivna napetost (V)', v: String(napetost(r)), r: true },
+        { l: 'Vrsta generatorja/razsmernika', izb: 'fotonapetostni' },
+        { l: 'Število faz', izb: OPC.faze[r.faze] || r.faze }
+      ]),
+      { sub: 'Predvidena letna proizvodnja' },
+      { l: 'Za lastne potrebe (kWh)', v: m.letno ? String(Math.round(m.lastne)) : '', r: true },
+      { l: 'Za oddajo v omrežje EES (kWh)', v: m.letno ? String(Math.round(m.oddaja)) : '', r: true },
+      { l: 'Predvidena letna proizvodnja (kWh)', v: m.letno ? String(Math.round(m.letno)) : '', h: 'Obrazec jo izračuna sam (ikona kalkulatorja) – preverite.' },
+      { sub: 'Priloge' },
+      tehRow('Gradbeno dovoljenje ali tehnična dokumentacija za izvedbo elektrarne'),
+      datRow('Kopija katastrskega načrta in zazidalna situacija', ['kataster'], 'Neobvezno.'),
+      datRow('Ostala dokazila', ['ostalo'], 'Neobvezno.')
+    ] });
+  }
+
+  if (c.vrste.f) {
+    const hr = c.hr, h0 = m.hee[0] || newHee();
+    out.push({ n: 'Podatki o hranilniku električne energije', v: [
+      { sub: 'Osnovni podatki' },
+      ...mmVrst.map(x => x.l === 'Sprememba na obstoječem merilnem mestu' ? { ...x, h: mm.obstojece ? 'Vklopite – sicer obrazec zahteva vlogo za novo merilno mesto.' : x.h } : x),
+      { sub: 'Številke predhodno izdanih dokumentov' },
+      { l: 'Številka predhodno izdanega soglasja za priključitev, na katerega se bo dodal nov hranilnik', v: hr.predhodnoSzp, h: 'Samo, če se hranilnik dodaja k že izdanemu soglasju.' },
+      { sub: 'Tehnični podatki' },
+      { l: 'Vrsta tehnologije', izb: OPC.tehnologija[h0.tehnologija] || h0.tehnologija, r: true },
+      { l: 'Naznačena kapaciteta (kWh)', v: cz(m.heeKwh), r: true, h: m.hee.length > 1 || kos(h0) > 1 ? 'Skupaj za vse enote.' : '' },
+      { l: 'Naznačena napetost (V)', v: String(napetost(h0)), r: true },
+      { l: 'Največja delovna moč polnjenja (kW)', v: cz(m.heeP), r: true },
+      { l: 'Največja delovna moč praznjenja (kW)', v: cz(m.heeO), r: true },
+      { l: 'Število faz', izb: OPC.faze[h0.faze] || h0.faze, r: true },
+      { l: 'Priključna moč (kW)', v: cz(mm.pmOdjem), r: true, h: 'Priključna moč odjema merilnega mesta.' },
+      { l: 'Način vključevanja v DS priključna shema', izb: OPC.shema[hr.shema], r: true },
+      { l: 'Način obratovanja', izb: join([OPC.obratovanje[hr.obratovanje], OPC.nacin[hr.nacin]], ' · '), r: true },
+      { l: 'Na voljo za sistemske storitve', izb: hr.sistemske ? 'Da' : 'Ne', h: 'Če se pojavi.' },
+      { sub: 'Katastrska občina in parcelna številka' },
+      ...(c.vrste.d ? [{ l: 'Podatki o lokaciji so enaki podatkom na vlogi za soglasje', izb: 'kliknite (Kopiraj/Prenesi)' }]
+        : [{ l: 'Katastrska občina', v: mm.ko, r: true }, { l: 'Parcelna številka', v: mm.parcele, r: true }]),
+      { l: 'Objekt se nahaja v več kot eni katastrski občini', izb: mm.vecKo ? 'vklopljeno' : 'izklopljeno' },
+      { sub: 'Priloge' },
+      tehRow('Idejna zasnova vključitve hranilnika el. energije v distribucijsko omrežje'),
+      { info: 'Bančna garancija velja samo za hranilnike po shemi PS.1B z močjo 1 MW ali več.' }
+    ] });
+  }
+
+  out.push({ n: 'Opombe in potrditev', v: [
+    { l: 'Opombe', v: opombe(c) },
+    { l: 'Strinjam se s pogoji, navedenimi v klavzulah', izb: 'obkljukajte', r: true, h: 'S pooblastilom je stranka potrdila, da je seznanjena s klavzulami.' }
+  ] });
+  out.push({ n: 'Tiskaj', v: [{ info: 'Neobvezno: shranite PDF kopijo vloge. Enako kopijo dobite po oddaji tudi po e-pošti.' }] });
+  out.push({ n: 'Zaključi', v: [
+    { info: 'Preglejte rdeče številke na levi strani obrazca (manjkajoča polja) in vlogo oddajte.' },
+    { info: 'Po oddaji pride na kontaktni e-naslov potrdilo s številko vloge – vpišite jo v razdelek »Po oddaji«.' }
+  ] });
+  // ključi za kljukice
+  out.forEach((k, i) => { let s = ''; k.v.forEach((x, j) => { if (x.sub) s = x.sub; x.k = `${i}|${s}|${x.l || x.info || x.sub}|${j}`; }); });
+  return out;
+}
+const rowEmpty = x => x.teh ? !TEHDOC_OK(cur()) : x.dat ? !x.dat.length : 'izb' in x ? !x.izb : 'v' in x ? !String(x.v ?? '').trim() : false;
+const TEHDOC_OK = c => c && !!TEHDOC[c.id];
+
+/* ---------- predloge e-pošte ---------- */
+function manjka(c) {
+  const im = c.im, mm = c.mm, out = [];
+  if (!im.davcna) out.push('vašo davčno številko');
+  if (mm.obstojece && !/^4-\d+$/.test(mm.st.replace(/\s/g, ''))) out.push('številko merilnega mesta (oblika 4-…, je na računu za elektriko)');
+  if (!mm.gsrn) out.push('GSRN kodo merilnega mesta (18 števk, je na računu za elektriko), če jo imate pri roki');
+  if (!mm.ko || !mm.parcele) out.push('katastrsko občino in parcelno številko objekta');
+  if (!num(mm.pmOdjem)) out.push('priključno moč merilnega mesta (na računu za elektriko)');
+  return out;
+}
+function fill(tpl, c) {
+  const iz = S.izvajalec, mk = manjka(c);
+  const vars = {
+    uporabnik: uporabnik(c), naslov: naslov(c.im), lokacija: lokacija(c) || '—', mm: c.mm.st && c.mm.st !== '4-' ? c.mm.st : '—',
+    naprava: napravaTxt(c) || '—', distributer: DIST.ime,
+    st_vloge: c.oddaja.st ? `, številka vloge ${c.oddaja.st}` : '',
+    blok_solastniki: c.im.solastniki ? '\nKer ima nepremičnina več solastnikov, naj pooblastilo podpišejo tudi solastniki (mesta za podpis so na pooblastilu).' : '',
+    blok_manjka: mk.length ? `Pošljite nam še:\n${mk.map(x => '  • ' + x).join('\n')}` : '',
+    izvajalec: iz.naziv, podpis: iz.podpis || iz.naziv
+  };
+  return String(tpl).replace(/\{\{(\w+)\}\}/g, (mt, key) => key in vars ? vars[key] : mt).replace(/\n{3,}/g, '\n\n');
+}
+const TPLS = ['pooblastilo', 'oddano'];
+
+/* ---------- pogledi ---------- */
+const app = $('#app');
+function render() {
+  $('#banner').innerHTML = pdfReady() ? '' :
+    `<div class="banner">PDF-jev (pooblastilo, tehnična dokumentacija) ni mogoče pripraviti, ker mapa <b>lib/</b> ni ob tej datoteki. Odprite <b>Vloga-za-soglasje.html</b> (ena datoteka z vsem).</div>`;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === state.view || (['edit', 'oddaja'].includes(state.view) && b.dataset.v === 'list')));
+  if (state.view === 'edit' && cur()) renderEdit();
+  else if (state.view === 'oddaja' && cur()) renderOddaja();
+  else if (state.view === 'settings') renderSettings();
+  else { state.view = 'list'; renderList(); }
+}
+
+function renderList() {
+  const rows = [...CASES].sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+  app.innerHTML = `
+  <div class="row" style="margin-bottom:12px"><h1 style="margin:0">Vloge za soglasje za priključitev</h1>
+    <div class="row" style="margin-left:auto">
+      <button class="pri" data-act="new">+ Nova vloga</button>
+      <button data-act="export">Izvozi varnostno kopijo</button>
+      <button data-act="import">Uvozi</button>
+    </div></div>
+  <div class="card tbl-wrap">${rows.length ? `
+    <table><thead><tr><th>Uporabnik</th><th>Lokacija</th><th>Naprava</th><th>Stanje</th><th>Št. vloge</th><th>Spremenjeno</th><th></th></tr></thead><tbody>
+    ${rows.map(c => { const m = moci(c); return `<tr class="click" data-act="open" data-id="${c.id}">
+      <td><b>${esc(uporabnik(c) || '(brez imena)')}</b></td><td class="small">${esc(lokacija(c))}</td>
+      <td class="small">${esc(join([m.kwp && fmtN(m.kwp) + ' kWp', m.kva && fmtN(m.kva) + ' kVA', m.heeKwh && fmtN(m.heeKwh) + ' kWh'], ' · '))}</td>
+      <td><span class="pill">${esc(STATUS[c.status] || c.status)}</span></td>
+      <td class="small">${esc(c.oddaja.st)}</td>
+      <td class="small muted">${fmtD(c.updated)}</td>
+      <td><button class="sm danger" data-act="del" data-id="${c.id}" title="Izbriši">✕</button></td></tr>`; }).join('')}
+    </tbody></table>` : `<p class="muted">Še ni vlog. Kliknite <b>+ Nova vloga</b>.</p>`}
+  </div>
+  <p class="small muted">Vloge oddajamo na spletnem obrazcu ${esc(DIST.ime)}. Orodje pripravi podatke za prepis, pooblastilo in tehnično dokumentacijo. Podatki se shranjujejo samo v tem brskalniku. Redno naredite izvoz varnostne kopije; ko je soglasje izdano in preneseno v Vloga-priklop, vlogo izbrišite (GDPR). Priložene datoteke se ne shranjujejo – ostanejo le do zaprtja strani.</p>`;
+}
+
+function inp(p, label, o = {}) {
+  const val = getPath(cur(), p) ?? '';
+  return `<label class="f${o.wide ? ' wide' : ''}">${label}<input data-p="${p}" value="${esc(val)}" type="${o.type || 'text'}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}${o.type === 'number' ? ' step="any" inputmode="decimal"' : ''}${o.full ? ' data-full="1"' : ''}></label>`;
+}
+function sel(p, label, opts, full) {
+  const val = getPath(cur(), p);
+  return `<label class="f">${label}<select data-p="${p}"${full ? ' data-full="1"' : ''}>${Object.entries(opts).map(([k, t]) => `<option value="${esc(k)}"${k === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+}
+function cb(p, label, full) {
+  return `<label class="c"><input type="checkbox" data-p="${p}"${getPath(cur(), p) ? ' checked' : ''}${full ? ' data-full="1"' : ''}> ${label}</label>`;
+}
+const katOpts = list => `<option value="">—</option>${list.map((k, j) => `<option value="${j}">${esc(join([k.proizvajalec, k.model], ' '))}</option>`).join('')}`;
+// Gumbi »≈ ocena« ob poljih; osvežijo se ob vsakem vnosu (updateDerived), brez ponovnega izrisa obrazca.
+function ocene(c) {
+  const m = moci(c), r = R();
+  return {
+    oceniPm: [m.kva ? Math.round(m.kva * 100) / 100 : 0, 'Moč razsmernikov', 2],
+    oceniLetno: [ocenaLetno(c), `${fmtN(m.kwp)} kWp × ${r.letniDonos} kWh/kWp`, 0],
+    oceniLastne: [c.el.letno || ocenaLetno(c) ? ocenaLastne(c) : 0, `${r.delezLastne} % proizvodnje`, 0]
+  };
+}
+const oceniBtn = (act, [val, title, d]) => val ? `<button class="sm" data-act="${act}" title="${esc(title)}">≈ ${fmtN(val, d)}</button>` : '';
+function numBtn(p, label, act) {
+  return `<label class="f">${label}<span class="row" style="gap:6px;flex-wrap:nowrap"><input data-p="${p}" value="${esc(getPath(cur(), p) ?? '')}" type="number" step="any" style="flex:1;min-width:0"><span data-ocena="${act}">${oceniBtn(act, ocene(cur())[act])}</span></span></label>`;
+}
+
+function renderEdit() {
+  const c = cur(), m = moci(c), PO = c.im.tip === 'po', f = fs(c), td = TEHDOC[c.id];
+  if (!TPLS.includes(state.tpl)) state.tpl = TPLS[0];
+  const pril = (k, extra = '') => {
+    const list = f[k] || [], P = PRILOGE[k];
+    return `<div class="pril"><div><b>${esc(P.n)}</b></div>
+      <div class="row" style="gap:6px">${extra}<label class="btn sm">Dodaj datoteko<input type="file" multiple hidden data-act="file" data-k="${k}"${k === 'listi' || k === 'enopolna' ? ' accept="application/pdf,image/png,image/jpeg"' : ''}></label></div>
+      <div class="meta">${list.length ? '📎 ' + list.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT && !['enopolna', 'listi'].includes(k) ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="${k}">počisti</button> · ` : ''}${esc(P.opis)}</div></div>`;
+  };
+  app.innerHTML = `
+  <div class="row" style="margin-bottom:10px">
+    <button data-act="view" data-v="list">← Vloge</button>
+    <h1 style="margin:0 0 0 6px">${esc(uporabnik(c) || 'Nova vloga')}</h1>
+    <button class="pri" style="margin-left:auto" data-act="view" data-v="oddaja">Oddaja na spletu →</button>
+  </div>
+  <div class="editor"><div>
+    <section class="card"><h2>1. Vloga</h2>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${cb('vrste.d', 'Soglasje za proizvodno napravo / napravo za individualno samooskrbo (sončna elektrarna)', true)}
+        ${cb('vrste.f', 'Soglasje za hranilnik električne energije', true)}
+      </div>
+      <div class="grid" style="margin-top:10px">${sel('status', 'Stanje', STATUS, true)}</div>
+    </section>
+
+    <section class="card"><h2>2. Uporabnik (investitor)</h2><div class="grid">
+      ${sel('im.tip', 'Vrsta uporabnika', { fo: 'Fizična oseba', po: 'Pravni subjekt' }, true)}
+      ${PO ? inp('im.naziv', 'Naziv') : inp('im.ime', 'Ime') + inp('im.priimek', 'Priimek')}
+      ${inp('im.ulica', 'Ulica / naselje')}
+      ${inp('im.hs', 'Hišna številka')}
+      ${inp('im.posta', 'Poštna številka in pošta', { ph: '2230 Lenart' })}
+      ${inp('im.kraj', 'Kraj (če ni enak pošti)')}
+      ${inp('im.davcna', 'Davčna številka')}
+      ${inp('im.tel', 'Telefon')}
+      ${inp('im.email', 'E-pošta', { type: 'email' })}
+    </div>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+      ${PO ? cb('im.zavezanec', 'Davčni zavezanec') : ''}
+      ${cb('im.solastniki', 'Nepremičnina ima več solastnikov', true)}
+      ${c.im.solastniki ? `<label class="f">Solastniki (ime in priimek, ločite z vejico) – dobijo mesto za podpis na pooblastilu<input data-p="im.solastnikiImena" value="${esc(c.im.solastnikiImena)}"></label>` : ''}
+      ${cb('plTretja', 'Plačnik stroškov priključevanja je tretja oseba (podatke vpišete ročno na obrazcu)')}
+    </div></section>
+
+    <section class="card"><h2>3. Merilno mesto in lokacija</h2>
+    <div style="margin-bottom:8px">${cb('mm.obstojece', 'Sprememba na obstoječem merilnem mestu', true)}</div>
+    <div class="grid">
+      ${c.mm.obstojece ? inp('mm.st', 'Številka merilnega mesta', { ph: '4-…' }) + inp('mm.gsrn', 'GSRN MM (neobvezno)', { ph: '18 števk' }) : ''}
+      ${inp('mm.pmOdjem', 'Priključna moč odjema MM (kW)', { type: 'number', ph: 'npr. 17' })}
+      ${inp('mm.predhodna', 'Št. informacije o možnosti priključitve', { ph: 'neobvezno (Moj Elektro)' })}
+      ${inp('mm.ko', 'Katastrska občina', { ph: 'npr. 532 Lenart' })}
+      ${inp('mm.parcele', 'Parcelna številka', { ph: 'več ločite z vejico' })}
+      ${inp('mm.leto', 'Predvideno leto priključitve', { type: 'number' })}
+    </div>
+    <div class="row" style="margin-top:8px;gap:18px">${cb('mm.enako', 'Naprava je na naslovu uporabnika', true)}${cb('mm.vecKo', 'Objekt je v več katastrskih občinah')}</div>
+    ${c.mm.enako ? '' : `<div class="grid" style="margin-top:8px">${inp('mm.ulica', 'Ulica / naselje')}${inp('mm.hs', 'Hišna številka')}${inp('mm.posta', 'Poštna številka in pošta', { ph: '2230 Lenart' })}${inp('mm.kraj', 'Kraj (če ni enak pošti)')}</div>`}
+    </section>
+
+    ${c.vrste.d ? `<section class="card"><h2>4. Elektrarna (naprava za samooskrbo)</h2><div class="grid">
+      ${inp('el.naziv', 'Naziv naprave', { ph: R().nazivNaprave })}
+      ${sel('el.vir', 'Proizvodni vir energije', OPC.vir)}
+      ${inp('el.panelModel', 'FN moduli – model')}
+      ${inp('el.panelKos', 'Število modulov', { type: 'number' })}
+      ${inp('el.panelWp', 'Moč modula (Wp)', { type: 'number' })}
+    </div>
+    <h3>Razsmerniki</h3>
+    <div class="tbl-wrap"><table class="siroka"><thead><tr><th style="min-width:140px">Iz kataloga</th><th>Proizvajalec</th><th style="min-width:130px">Model</th><th style="width:75px">kVA</th><th style="width:60px">Kos</th><th style="width:70px">Faze</th><th style="width:75px" title="Prazno = 400 V (3f) oz. 230 V (1f)">Napetost V</th><th></th></tr></thead><tbody>
+    ${c.rs.map((r, i) => `<tr>
+      <td><select data-act="katRs" data-i="${i}">${katOpts(S.katalog.razsmerniki)}</select></td>
+      <td><input data-p="rs.${i}.proizvajalec" value="${esc(r.proizvajalec)}"></td>
+      <td><input data-p="rs.${i}.model" value="${esc(r.model)}"></td>
+      <td><input data-p="rs.${i}.kva" value="${esc(r.kva)}" type="number" step="any"></td>
+      <td><input data-p="rs.${i}.kos" value="${esc(r.kos)}" type="number" min="1" step="1"></td>
+      <td><select data-p="rs.${i}.faze">${Object.keys(OPC.faze).map(k => `<option${k === r.faze ? ' selected' : ''}>${k}</option>`).join('')}</select></td>
+      <td><input data-p="rs.${i}.napetost" value="${esc(r.napetost)}" type="number" step="any" placeholder="${napetost(r)}"></td>
+      <td><button class="sm danger" data-act="delRs" data-i="${i}" title="Odstrani">✕</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="sm" style="margin-top:6px" data-act="addRs">+ Razsmernik</button>
+    <h3>Priključna moč in obratovanje</h3>
+    <div class="grid">
+      ${inp('el.pmObstojeca', 'Obstoječa priključna moč oddaje (kW)', { type: 'number' })}
+      ${numBtn('el.pmNova', 'Nova priključna moč (kW)', 'oceniPm')}
+      ${sel('el.shema', 'Tipska shema', OPC.shema)}
+      ${sel('el.obratovanje', 'Obratovanje', OPC.obratovanje)}
+      ${sel('el.nacin', 'Način', OPC.nacin)}
+    </div>
+    <div style="margin-top:8px">${cb('el.sistemske', 'Na voljo za sistemske storitve')}</div>
+    <h3>Predvidena letna proizvodnja</h3>
+    <div class="grid">
+      ${numBtn('el.letno', 'Skupaj (kWh)', 'oceniLetno')}
+      ${numBtn('el.lastne', 'Za lastne potrebe (kWh)', 'oceniLastne')}
+      <label class="f">Za oddajo v omrežje (kWh)<input id="oddajaKwh" value="${m.letno ? Math.round(m.oddaja) : ''}" readonly tabindex="-1"></label>
+    </div>
+    </section>` : ''}
+
+    ${c.vrste.f ? `<section class="card"><h2>${c.vrste.d ? 5 : 4}. Hranilnik</h2>
+    ${c.hee.length ? `<div class="tbl-wrap"><table class="siroka"><thead><tr><th style="min-width:140px">Iz kataloga</th><th>Proizvajalec</th><th style="min-width:120px">Model</th><th style="width:80px">Tehnol.</th><th style="width:70px">kWh</th><th style="width:70px" title="Največja delovna moč polnjenja">kW polnj.</th><th style="width:70px" title="Največja delovna moč praznjenja (prazno = enaka polnjenju)">kW prazn.</th><th style="width:55px">Kos</th><th style="width:65px">Faze</th><th style="width:70px" title="Prazno = 400 V (3f) oz. 230 V (1f)">Napetost V</th><th></th></tr></thead><tbody>
+    ${c.hee.map((h, i) => `<tr>
+      <td><select data-act="katHee" data-i="${i}">${katOpts(S.katalog.hranilniki)}</select></td>
+      <td><input data-p="hee.${i}.proizvajalec" value="${esc(h.proizvajalec)}"></td>
+      <td><input data-p="hee.${i}.model" value="${esc(h.model)}"></td>
+      <td><select data-p="hee.${i}.tehnologija">${Object.entries(OPC.tehnologija).map(([k, t]) => `<option value="${k}"${k === h.tehnologija ? ' selected' : ''}>${t}</option>`).join('')}</select></td>
+      <td><input data-p="hee.${i}.kwh" value="${esc(h.kwh)}" type="number" step="any"></td>
+      <td><input data-p="hee.${i}.kwP" value="${esc(h.kwP)}" type="number" step="any"></td>
+      <td><input data-p="hee.${i}.kwO" value="${esc(h.kwO)}" type="number" step="any"></td>
+      <td><input data-p="hee.${i}.kos" value="${esc(h.kos)}" type="number" min="1" step="1"></td>
+      <td><select data-p="hee.${i}.faze">${Object.keys(OPC.faze).map(k => `<option${k === h.faze ? ' selected' : ''}>${k}</option>`).join('')}</select></td>
+      <td><input data-p="hee.${i}.napetost" value="${esc(h.napetost)}" type="number" step="any" placeholder="${napetost(h)}"></td>
+      <td><button class="sm danger" data-act="delHee" data-i="${i}" title="Odstrani">✕</button></td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+    <button class="sm" style="margin-top:6px" data-act="addHee">+ Hranilnik</button>
+    <div class="grid" style="margin-top:12px">
+      ${sel('hr.shema', 'Priključna shema', OPC.shema)}
+      ${sel('hr.obratovanje', 'Obratovanje', OPC.obratovanje)}
+      ${sel('hr.nacin', 'Način', OPC.nacin)}
+      ${inp('hr.predhodnoSzp', 'Št. že izdanega soglasja', { ph: 'samo, če se hranilnik dodaja' })}
+    </div>
+    <div style="margin-top:8px">${cb('hr.sistemske', 'Na voljo za sistemske storitve')}</div>
+    <p class="small muted" style="margin:8px 0 0">Na spletnem obrazcu je en hranilnik: kapaciteta in moči se seštejejo, tehnologija in faze se vzamejo s prvega.</p>
+    </section>` : ''}
+
+    <section class="card"><h2>Priloge</h2>
+      <div class="pril"><div><b>Pooblastilo investitorja</b> <span class="pill">podpiše stranka</span></div>
+        <div class="row" style="gap:6px"><button class="sm pri" data-act="genPoob"${pdfReady() ? '' : ' disabled'}>Pokaži pooblastilo za podpis</button><label class="btn sm">Podpisano<input type="file" multiple hidden data-act="file" data-k="pooblastilo"></label></div>
+        <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}Vsebuje tudi izjavo, da je stranka seznanjena s klavzulami o varstvu osebnih podatkov${c.im.solastniki ? ' in mesta za podpise solastnikov' : ''}.</div></div>
+      ${pril('enopolna')}
+      ${pril('listi')}
+      <div class="pril"><div><b>Tehnična dokumentacija (PDF)</b> <span class="pill">pripravi orodje</span></div>
+        <div class="row" style="gap:6px"><button class="sm pri" data-act="genTeh"${pdfReady() ? '' : ' disabled'}>Pripravi in pokaži</button></div>
+        <div class="meta">Podatki o napravi + enopolna shema + tehnični listi v eni datoteki. Naloži se pri elektrarni (»tehnična dokumentacija za izvedbo«)${c.vrste.f ? ' in pri hranilniku (»idejna zasnova vključitve«)' : ''}.${td ? ` Zadnja pripravljena: <b class="${td.size > MAX_DAT ? 'bad' : ''}">${fmtMB(td.size)}</b>${td.size > MAX_DAT ? ' – več kot 4 MB!' : ''}.` : ''}</div></div>
+      ${pril('kataster')}
+      ${pril('ostalo')}
+      <p class="small muted" style="margin:8px 0 0">Datoteke se ne shranijo – ob ponovnem odprtju jih dodajte znova. Spletni obrazec sprejme datoteke do 4 MB.</p>
+    </section>
+
+    <section class="card"><h2>Opombe v vlogi</h2>
+      <div style="margin-bottom:6px">${cb('opombeRocno', 'Opombe napišem sam', true)}</div>
+      ${c.opombeRocno ? `<textarea data-p="opombe" rows="3">${esc(c.opombe)}</textarea>` : `<p class="small" style="margin:0">${esc(opombeAuto(c))}</p>`}
+    </section>
+
+    <section class="card"><h2>E-pošta stranki</h2>
+      <div class="tabs">${TPLS.map(t => `<button class="sm${t === state.tpl ? ' on' : ''}" data-act="tpl" data-t="${t}">${esc(S.templates[t].ime)}</button>`).join('')}</div>
+      <label class="f">Prejemnik<input id="mailTo" readonly></label>
+      <label class="f" style="margin-top:8px">Zadeva<input id="mailSubj" readonly></label>
+      <label class="f" style="margin-top:8px">Besedilo<textarea id="mailBody" rows="14"></textarea></label>
+      <div class="row" style="margin-top:8px">
+        <button data-act="copyMail">Kopiraj besedilo</button>
+        <button data-act="mailto">Odpri v programu za e-pošto</button>
+      </div>
+      <p class="small muted" style="margin:6px 0 0">Pooblastilo (gumb zgoraj → Prenesi) pripnite ročno.</p>
+    </section>
+
+    <section class="card"><h2>Po oddaji</h2><div class="grid">
+      ${inp('oddaja.st', 'Številka vloge (iz potrdila)')}
+      ${inp('oddaja.datum', 'Datum oddaje', { type: 'date' })}
+      ${inp('oddaja.szp', 'Številka soglasja za priključitev')}
+      ${inp('oddaja.szpDatum', 'Datum soglasja', { type: 'date' })}
+      ${inp('oddaja.szpPm', 'Priključna moč oddaje iz soglasja (kW)', { type: 'number' })}
+    </div>
+    <div class="row" style="margin-top:10px"><button data-act="vPriklop">Izvozi v Vloga-priklop</button></div>
+    <p class="small muted" style="margin:6px 0 0">Ko pride soglasje, vpišite številko in priključno moč ter izvozite. Datoteko uvozite v orodju Vloga-priklop (Vloge → Uvozi) – stranka, merilno mesto in oprema se prenesejo.</p>
+    </section>
+  </div>
+  <aside id="aside"></aside></div>`;
+  updateDerived();
+}
+
+function updateDerived() {
+  const c = cur(); if (!c) return;
+  const m = moci(c), ch = checks(c);
+  const kk = koraki(c), vse = kk.flatMap(k => k.v).filter(x => !x.sub && !x.info), ok = vse.filter(x => c.done[x.k]).length;
+  const aside = $('#aside'); if (!aside) return;
+  const oc = ocene(c);
+  document.querySelectorAll('[data-ocena]').forEach(el => { el.innerHTML = oceniBtn(el.dataset.ocena, oc[el.dataset.ocena]); });
+  if ($('#oddajaKwh')) $('#oddajaKwh').value = m.letno ? Math.round(m.oddaja) : '';
+  aside.innerHTML = `
+    <div class="card"><div class="muted small">Naprava</div><div class="big">${m.kwp ? fmtN(m.kwp) + ' kWp' : m.kva ? fmtN(m.kva) + ' kVA' : '—'}</div>
+      <dl class="kv" style="margin-top:8px">
+        ${m.kva ? `<dt>Razsmerniki</dt><dd>${fmtN(m.kva)} kVA</dd>` : ''}
+        ${m.heeKwh ? `<dt>Hranilnik</dt><dd>${fmtN(m.heeKwh)} kWh, ${fmtN(m.heeP)} kW</dd>` : ''}
+        <dt>Priključna moč odjema</dt><dd>${c.mm.pmOdjem ? cn(c.mm.pmOdjem) + ' kW' : '—'}</dd>
+        ${c.vrste.d ? `<dt>Nova moč oddaje</dt><dd>${c.el.pmNova ? cn(c.el.pmNova) + ' kW' : '—'}</dd>` : ''}
+        <dt>Oddaja na spletu</dt><dd>${ok} / ${vse.length}</dd>
+      </dl>
+      <button class="pri" style="margin-top:10px;width:100%;justify-content:center" data-act="view" data-v="oddaja">Oddaja na spletu →</button></div>
+    <div class="card"><h2>Kontrole</h2><ul class="chk">${ch.map(([l, t]) => `<li class="${l}">${esc(t)}</li>`).join('')}</ul></div>`;
+  const subj = $('#mailSubj'), body = $('#mailBody'), t = S.templates[state.tpl];
+  if (subj && t && document.activeElement !== body) { $('#mailTo').value = c.im.email || '(ni vpisan)'; subj.value = fill(t.zadeva, c); body.value = fill(t.telo, c); }
+}
+
+function renderOddaja() {
+  const c = cur(), kk = koraki(c), ch = checks(c).filter(x => x[0] === 'err');
+  const open = state.korak ?? kk.findIndex(k => k.v.some(x => !x.sub && !x.info && !c.done[x.k]));
+  app.innerHTML = `<div class="wiz">
+  <div class="row" style="margin-bottom:10px">
+    <button data-act="view" data-v="edit">← Podatki</button>
+    <h1 style="margin:0 0 0 6px">${esc(uporabnik(c) || 'Vloga')} – oddaja na spletu</h1>
+  </div>
+  <div class="card">
+    <div class="row"><a class="btn pri" href="${FORM_URL}" target="_blank" rel="noopener">Odpri spletni obrazec ${esc(DIST.ime)} ↗</a>
+      <button class="sm" data-act="resetDone">Počisti kljukice</button></div>
+    <p class="small muted" style="margin:8px 0 0">Obrazec in to stran postavite drugo ob drugo. Kliknite <b>Kopiraj</b> in prilepite v polje z enakim imenom (Ctrl+V). Kljukica se postavi sama; kliknete jo lahko tudi ročno. Pri <b>Izberite</b> kliknite možnost na obrazcu. Vrstni red je enak kot na obrazcu.</p>
+    ${ch.length ? `<ul class="chk" style="margin-top:10px">${ch.map(([l, t]) => `<li class="${l}">${esc(t)}</li>`).join('')}</ul>` : ''}
+  </div>
+  ${kk.map((k, i) => {
+    const vr = k.v.filter(x => !x.sub && !x.info), ok = vr.filter(x => c.done[x.k]).length, done = vr.length ? ok === vr.length : !!c.done[`korak${i}`];
+    return `<details class="card korak${done ? ' done' : ''}" data-korak="${i}"${i === open ? ' open' : ''}>
+      <summary><span class="num">${done ? '✓' : i + 1}</span>${esc(k.n)}<span class="prog">${vr.length ? `${ok} / ${vr.length}` : ''}</span></summary>
+      ${k.v.map(x => vrstica(c, x)).join('')}
+    </details>`;
+  }).join('')}
+  </div>`;
+}
+function vrstica(c, x) {
+  if (x.sub) return `<div class="vr sub"><span></span><span class="lab" style="grid-column:2/5">${esc(x.sub)}</span></div>`;
+  if (x.info) return `<div class="vr"><span>ℹ️</span><span class="small" style="grid-column:2/5">${esc(x.info)}</span></div>`;
+  const ok = !!c.done[x.k], miss = x.r && rowEmpty(x);
+  let val, btn = '';
+  if (x.teh) {
+    const td = TEHDOC[c.id];
+    val = td ? `naložite <b>${esc(td.name)}</b> <span class="${td.size > MAX_DAT ? 'bad' : 'muted'}">(${fmtMB(td.size)})</span>` : '<span class="bad">tehnična dokumentacija še ni pripravljena</span>';
+    btn = `<button class="sm" data-act="tehDl"${pdfReady() ? '' : ' disabled'}>${td ? 'Prenesi' : 'Pripravi'}</button>`;
+  } else if (x.dat) {
+    val = x.dat.length ? 'naložite: <b>' + x.dat.map(esc).join(', ') + '</b>' : (x.r ? '— datoteka še ni dodana v orodje' : '<span class="muted">— (neobvezno)</span>');
+  } else if ('izb' in x) {
+    val = x.izb ? `Izberite: <span class="izb">${esc(x.izb)}</span>` : (x.r ? '— izberite na obrazcu' : '—');
+  } else {
+    val = String(x.v ?? '').trim() ? esc(x.v) : (x.r ? '— manjka' : '<span class="muted">—</span>');
+    if (String(x.v ?? '').trim()) btn = `<button class="sm" data-act="cp" data-k="${esc(x.k)}">Kopiraj</button>`;
+  }
+  return `<div class="vr${ok ? ' ok' : ''}${miss ? ' miss' : ''}">
+    <input type="checkbox" data-act="done" data-k="${esc(x.k)}"${ok ? ' checked' : ''} title="Opravljeno">
+    <span class="lab">${esc(x.l)}${x.r ? ' *' : ''}</span><span class="val">${val}</span><span>${btn}</span>
+    ${x.h ? `<span class="hint">${esc(x.h)}</span>` : ''}</div>`;
+}
+
+function renderSettings() {
+  const iz = S.izvajalec;
+  const f = (p, label, o = {}) => `<label class="f${o.wide ? ' wide' : ''}">${label}<input data-s="${p}" value="${esc(getPath(S, p) ?? '')}" type="${o.type || 'text'}"${o.type === 'number' ? ' step="any"' : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}></label>`;
+  const katTbl = (key, cols) => `<div class="tbl-wrap"><table><thead><tr>${cols.map(([, h, w]) => `<th${w ? ` style="width:${w}px"` : ''}>${h}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${S.katalog[key].map((k, i) => `<tr>${cols.map(([p, , , t]) => t === 'faze' ? `<td><select data-s="katalog.${key}.${i}.${p}">${Object.keys(OPC.faze).map(o => `<option${o === k[p] ? ' selected' : ''}>${o}</option>`).join('')}</select></td>`
+      : t === 'teh' ? `<td><select data-s="katalog.${key}.${i}.${p}">${Object.entries(OPC.tehnologija).map(([o, tt]) => `<option value="${o}"${o === k[p] ? ' selected' : ''}>${tt}</option>`).join('')}</select></td>`
+      : `<td><input data-s="katalog.${key}.${i}.${p}" value="${esc(k[p])}"${t ? ' type="number" step="any"' : ''}></td>`).join('')}
+      <td><button class="sm danger" data-act="katDel" data-k="${key}" data-i="${i}">✕</button></td></tr>`).join('')}
+    </tbody></table></div><button class="sm" style="margin-top:8px" data-act="katAdd" data-k="${key}">+ Model</button>`;
+  app.innerHTML = `
+  <h1>Nastavitve</h1>
+  <section class="card"><h2>Pooblaščenec (mi)</h2><div class="grid">
+    ${f('izvajalec.naziv', 'Naziv podjetja')}${f('izvajalec.ulica', 'Ulica / naselje')}${f('izvajalec.hs', 'Hišna številka')}
+    ${f('izvajalec.posta', 'Poštna številka in pošta')}${f('izvajalec.kraj', 'Kraj (če ni enak pošti)')}
+    ${f('izvajalec.davcna', 'Davčna številka')}${f('izvajalec.maticna', 'Matična številka')}${f('izvajalec.zastopnik', 'Zastopnik')}
+    ${f('izvajalec.kontakt', 'Kontaktna oseba v vlogi')}${f('izvajalec.tel', 'Telefon')}${f('izvajalec.email', 'E-pošta')}
+  </div>
+  <label class="c" style="margin-top:10px"><input type="checkbox" data-s="rules.kontaktNas"${R().kontaktNas ? ' checked' : ''}> Kontaktni podatki v vlogi so naši (potrdilo in številka vloge prideta na naš e-naslov)</label>
+  <label class="f" style="margin-top:8px">Podpis v e-pošti<textarea data-s="izvajalec.podpis" rows="3">${esc(iz.podpis)}</textarea></label>
+  </section>
+
+  <section class="card"><h2>Katalog opreme</h2>
+    <p class="small muted" style="margin-top:0">Katalog lahko prenesete iz orodja Vloga-priklop: tam naredite <b>Izvozi varnostno kopijo</b>, tukaj pa <b>Uvozi katalog</b>.</p>
+    <button class="sm" data-act="importKat">Uvozi katalog iz Vloga-priklop</button>
+    <h3>Razsmerniki</h3>
+    ${katTbl('razsmerniki', [['proizvajalec', 'Proizvajalec'], ['model', 'Model'], ['kva', 'kVA', 80, 1], ['faze', 'Faze', 70, 'faze']])}
+    <h3 style="margin-top:16px">Hranilniki</h3>
+    ${katTbl('hranilniki', [['proizvajalec', 'Proizvajalec'], ['model', 'Model'], ['tehnologija', 'Tehnol.', 90, 'teh'], ['kwh', 'kWh', 70, 1], ['kwP', 'kW polnj.', 80, 1], ['kwO', 'kW prazn.', 80, 1], ['faze', 'Faze', 70, 'faze']])}
+  </section>
+
+  <details class="card"><summary><b>Napredno: pravila in predloge e-pošte</b></summary>
+  <section style="margin-top:12px"><h2>Pravila</h2><div class="grid">
+      ${f('rules.letniDonos', 'Ocena letne proizvodnje (kWh/kWp)', { type: 'number' })}
+      ${f('rules.delezLastne', 'Delež za lastne potrebe (%)', { type: 'number' })}
+      <label class="f">Decimalno ločilo pri kopiranju<select data-s="rules.decimalka"><option value=","${R().decimalka === ',' ? ' selected' : ''}>vejica (9,8)</option><option value="."${R().decimalka === '.' ? ' selected' : ''}>pika (9.8)</option></select></label>
+      ${f('rules.nazivNaprave', 'Privzeti naziv naprave')}
+      ${f('rules.vrstaNaprave', 'Izbira »Vrsta proizvodne naprave«')}
+      ${f('rules.dodatniPodatki', 'Izbira »Dodatni podatki potrebni za izdajo soglasja«', { ph: 'prepišite z obrazca' })}
+    </div>
+    <p class="small muted" style="margin:8px 0 0">Izbire vpišite z enakim besedilom kot na spletnem obrazcu – pomočnik jih prikaže pri ustreznem polju.</p>
+  </section>
+  <section style="margin-top:16px"><h2>Predloge e-pošte</h2>
+    <p class="small muted" style="margin-top:0">Spremenljivke: ${['uporabnik', 'naslov', 'lokacija', 'mm', 'naprava', 'distributer', 'st_vloge', 'blok_solastniki', 'blok_manjka', 'izvajalec', 'podpis'].map(v => `<code>{{${v}}}</code>`).join(' ')}.</p>
+    ${Object.entries(S.templates).map(([key, t]) => `
+      <h2 style="margin-top:14px">${esc(t.ime)}</h2>
+      <label class="f">Zadeva<input data-s="templates.${key}.zadeva" value="${esc(t.zadeva)}"></label>
+      <label class="f" style="margin-top:6px">Besedilo<textarea data-s="templates.${key}.telo" rows="12">${esc(t.telo)}</textarea></label>`).join('')}
+  </section>
+  </details>
+
+  <section class="card"><h2>Ponastavitev</h2><div class="row">
+    <button data-act="resetRules">Ponastavi pravila in predloge na privzete</button>
+    <button class="danger" data-act="wipe">Izbriši vse vloge iz tega brskalnika</button>
+  </div></section>`;
+}
+
+/* ---------- dogodki ---------- */
+function onField(e) {
+  const t = e.target;
+  if (t.dataset.p && cur()) {
+    const c = cur();
+    setPath(c, t.dataset.p, t.type === 'checkbox' ? t.checked : t.value);
+    c.updated = today(); saveCases();
+    if (t.dataset.p.startsWith('rs.') || t.dataset.p.startsWith('hee.') || t.dataset.p.startsWith('el.') || t.dataset.p.startsWith('im.') || t.dataset.p.startsWith('mm.')) delete TEHDOC[c.id];
+    if (t.dataset.full) renderEdit(); else updateDerived();
+  } else if (t.dataset.s) {
+    setPath(S, t.dataset.s, t.type === 'checkbox' ? t.checked : (t.type === 'number' ? num(t.value) : t.value));
+    saveSettings();
+  }
+}
+app.addEventListener('input', e => { if (e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT' && !e.target.dataset.act) onField(e); });
+app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.act === 'katRs' || t.dataset.act === 'katHee') {
+    const rs = t.dataset.act === 'katRs', k = S.katalog[rs ? 'razsmerniki' : 'hranilniki'][+t.value], c = cur(); if (!k) return;
+    Object.assign(c[rs ? 'rs' : 'hee'][+t.dataset.i], clone(k));
+    c.updated = today(); delete TEHDOC[c.id]; saveCases(); renderEdit(); return;
+  }
+  if (t.dataset.act === 'file') {
+    const c = cur(), f = (FILES[c.id] ||= {});
+    f[t.dataset.k] = [...(f[t.dataset.k] || []), ...t.files];
+    if (['enopolna', 'listi'].includes(t.dataset.k)) delete TEHDOC[c.id];
+    renderEdit(); return;
+  }
+  if (t.dataset.act === 'done') {
+    const c = cur(); if (t.checked) c.done[t.dataset.k] = true; else delete c.done[t.dataset.k];
+    saveCases(); state.korak = +t.closest('[data-korak]').dataset.korak; renderOddaja(); return;
+  }
+  if (t.type === 'checkbox' || t.tagName === 'SELECT') onField(e);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && PV) closePreview(); });
+app.addEventListener('toggle', e => { if (e.target.dataset && e.target.dataset.korak != null && e.target.open) state.korak = +e.target.dataset.korak; }, true);
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.tagName === 'SELECT' || b.type === 'file' || b.type === 'checkbox') return;
+  const act = b.dataset.act, c = cur();
+  if (act !== 'open') e.stopPropagation();
+  switch (act) {
+    case 'view': e.preventDefault(); state.view = b.dataset.v; state.korak = undefined; render(); window.scrollTo(0, 0); break;
+    case 'new': { const n = newCase(); CASES.push(n); saveCases(); state = { view: 'edit', id: n.id, tpl: null }; render(); break; }
+    case 'open': if (e.target.closest('button')) break; state = { view: 'edit', id: b.dataset.id, tpl: null }; render(); window.scrollTo(0, 0); break;
+    case 'del': {
+      const x = CASES.find(y => y.id === b.dataset.id);
+      if (confirm(`Izbrišem vlogo »${uporabnik(x) || 'brez imena'}«?`)) { CASES = CASES.filter(y => y.id !== x.id); delete FILES[x.id]; delete TEHDOC[x.id]; lsSet(LS_CASES, CASES); render(); }
+      break;
+    }
+    case 'addRs': c.rs.push(newRs()); saveCases(); renderEdit(); break;
+    case 'delRs': c.rs.splice(+b.dataset.i, 1); delete TEHDOC[c.id]; saveCases(); renderEdit(); break;
+    case 'addHee': c.hee.push(newHee()); saveCases(); renderEdit(); break;
+    case 'delHee': c.hee.splice(+b.dataset.i, 1); delete TEHDOC[c.id]; saveCases(); renderEdit(); break;
+    case 'oceniLetno': c.el.letno = String(ocenaLetno(c)); saveCases(); renderEdit(); break;
+    case 'oceniLastne': c.el.lastne = String(ocenaLastne(c)); saveCases(); renderEdit(); break;
+    case 'oceniPm': c.el.pmNova = String(ocene(c).oceniPm[0]); saveCases(); renderEdit(); break;
+    case 'clrFiles': delete fs(c)[b.dataset.k]; if (['enopolna', 'listi'].includes(b.dataset.k)) delete TEHDOC[c.id]; renderEdit(); break;
+    case 'genPoob': showPdf(c, 'poob'); break;
+    case 'genTeh': showPdf(c, 'teh'); break;
+    case 'tehDl': {
+      if (!TEHDOC[c.id]) { const ok = await pripraviTeh(c); if (!ok) break; }
+      download(TEHDOC[c.id].name, new Blob([TEHDOC[c.id].bytes], { type: 'application/pdf' }));
+      renderOddaja(); break;
+    }
+    case 'cp': {
+      const x = koraki(c).flatMap(k => k.v).find(y => y.k === b.dataset.k); if (!x) break;
+      await copyText(String(x.v)); c.done[x.k] = true; saveCases();
+      state.korak = +b.closest('[data-korak]').dataset.korak; renderOddaja(); toast(`Kopirano: ${String(x.v).slice(0, 60)}`);
+      break;
+    }
+    case 'resetDone': if (confirm('Počistim vse kljukice?')) { c.done = {}; saveCases(); state.korak = undefined; renderOddaja(); } break;
+    case 'tpl': state.tpl = b.dataset.t; renderEdit(); break;
+    case 'copyMail': await copyText($('#mailBody').value); toast('Besedilo kopirano.'); break;
+    case 'mailto': location.href = `mailto:${encodeURIComponent(c.im.email || '')}?subject=${encodeURIComponent($('#mailSubj').value)}&body=${encodeURIComponent($('#mailBody').value)}`; break;
+    case 'vPriklop': izvoziPriklop(c); break;
+    case 'pvDl': if (PV) download(PV.name, new Blob([PV.bytes], { type: 'application/pdf' })); break;
+    case 'pvClose': closePreview(); break;
+    case 'katAdd': S.katalog[b.dataset.k].push(b.dataset.k === 'razsmerniki' ? { proizvajalec: '', model: '', kva: '', faze: '3f' } : { proizvajalec: '', model: '', tehnologija: 'LFP', kwh: '', kwP: '', kwO: '', faze: '3f' }); saveSettings(); renderSettings(); break;
+    case 'katDel': S.katalog[b.dataset.k].splice(+b.dataset.i, 1); saveSettings(); renderSettings(); break;
+    case 'importKat': $('#importKat').click(); break;
+    case 'export': download(`vloge-soglasje-${today()}.json`, JSON.stringify({ orodje: 'vloga-za-soglasje', verzija: 1, izvoz: today(), nastavitve: S, vloge: CASES }, null, 2), 'application/json'); break;
+    case 'import': $('#importFile').click(); break;
+    case 'resetRules':
+      if (confirm('Ponastavim pravila in predloge e-pošte na privzete? Podatki pooblaščenca, katalog in vloge ostanejo.')) {
+        S.rules = clone(DEFAULTS.rules); S.templates = clone(DEFAULTS.templates); saveSettings(); render();
+      }
+      break;
+    case 'wipe':
+      if (confirm('Res izbrišem VSE vloge iz tega brskalnika? Najprej naredite izvoz varnostne kopije.')) { CASES = []; lsSet(LS_CASES, CASES); render(); }
+      break;
+  }
+});
+
+$('#importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.vloge) || d.orodje !== 'vloga-za-soglasje') throw 0;
+    const known = new Set(CASES.map(c => c.id));
+    const add = d.vloge.filter(c => c && c.id && !known.has(c.id)).map(c => merge(newCase(), c));
+    const repl = d.nastavitve && confirm(`Datoteka vsebuje ${d.vloge.length} vlog (${add.length} novih). Uvozim tudi nastavitve iz datoteke?`);
+    CASES.push(...add); lsSet(LS_CASES, CASES);
+    if (repl) { S = merge(DEFAULTS, d.nastavitve); saveSettings(); }
+    toast(`Uvoženih vlog: ${add.length}.`); render();
+  } catch (err) { toast('Datoteke ni bilo mogoče uvoziti (ni varnostna kopija tega orodja).'); }
+});
+// Katalog iz varnostne kopije orodja Vloga-priklop (razsmerniki: kva; hranilniki: kwh, kvaP, kvaO).
+$('#importKat').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text()), k = (d.nastavitve || d).katalog;
+    if (!k) throw 0;
+    const key = x => `${x.proizvajalec}|${x.model}`.toLowerCase().trim();
+    const imaRs = new Set(S.katalog.razsmerniki.map(key)), imaHee = new Set(S.katalog.hranilniki.map(key));
+    const rs = (k.razsmerniki || []).filter(x => !imaRs.has(key(x))).map(x => ({ proizvajalec: x.proizvajalec || '', model: x.model || '', kva: x.kva ?? '', faze: x.faze || '3f', sodo: !!x.sodo }));
+    const hee = (k.hranilniki || []).filter(x => !imaHee.has(key(x))).map(x => ({ proizvajalec: x.proizvajalec || '', model: x.model || '', tehnologija: x.tehnologija || 'LFP', kwh: x.kwh ?? '', kwP: x.kwP ?? x.kvaP ?? '', kwO: x.kwO ?? x.kvaO ?? '', faze: x.faze || '3f', sodo: !!x.sodo }));
+    S.katalog.razsmerniki.push(...rs); S.katalog.hranilniki.push(...hee); saveSettings(); renderSettings();
+    toast(`Dodano: ${rs.length} razsmernikov, ${hee.length} hranilnikov.${hee.length ? ' Preverite tehnologijo in faze.' : ''}`);
+  } catch (err) { toast('V datoteki ni kataloga opreme.'); }
+});
+
+/* ---------- izvoz v Vloga-priklop ---------- */
+function izvoziPriklop(c) {
+  const m = moci(c), L = lok(c);
+  const vloga = {
+    id: uid(), created: today(), updated: today(), dist: 'elektro-maribor', status: 'priprava',
+    im: { tip: c.im.tip, ime: c.im.ime, priimek: c.im.priimek, naziv: c.im.naziv, odgovorna: '', ulica: join([c.im.ulica, c.im.hs], ' '), posta: c.im.posta, davcna: c.im.davcna, tel: c.im.tel, email: c.im.email },
+    mm: {
+      st: c.mm.gsrn || (c.mm.st !== '4-' ? c.mm.st : ''), szp: c.oddaja.szp, pmPrevzem: c.mm.pmOdjem, pmOddaja: c.oddaja.szpPm || c.el.pmNova,
+      enako: c.mm.enako, ulica: c.mm.enako ? '' : join([L.ulica, L.hs], ' '), posta: c.mm.enako ? '' : L.posta, letno: m.letno ? String(Math.round(m.oddaja)) : ''
+    },
+    pn: { vrsta: m.hee.length ? 'sončna elektrarna s hranilnikom' : 'sončna elektrarna', samooskrba: true, panelModel: c.el.panelModel, panelKos: c.el.panelKos, panelWp: c.el.panelWp },
+    rs: m.rs.map(r => ({ proizvajalec: r.proizvajalec, model: r.model, kva: r.kva, kos: kos(r), sodo: !!r.sodo })),
+    hee: m.hee.map(h => ({ proizvajalec: h.proizvajalec, model: h.model, kwh: h.kwh, kvaP: h.kwP, kvaO: h.kwO, kos: kos(h), sodo: !!h.sodo })),
+    pl: { drug: false }
+  };
+  download(`v-priklop_${fileBase(c)}.json`, JSON.stringify({ verzija: 1, izvoz: today(), vloge: [vloga] }, null, 2), 'application/json');
+  toast(c.oddaja.szp ? 'Izvoženo – uvozite v Vloga-priklop (Vloge → Uvozi).' : 'Izvoženo brez številke soglasja – dopolnite jo v Vloga-priklop.');
+}
+
+/* ---------- PDF: pooblastilo in tehnična dokumentacija ---------- */
+const b64 = str => Uint8Array.from(atob(str), ch => ch.charCodeAt(0));
+const pdfReady = () => !!(window.PDFLib && window.fontkit && window.VS_PISAVA);
+let FONT_BYTES;
+const TEHDOC = {}; // caseId -> { name, bytes, size } – zadnja pripravljena tehnična dokumentacija
+const A4 = [595.28, 841.89], ML = 62, MR = 62, INK = () => PDFLib.rgb(0.1, 0.1, 0.12), GRAY = () => PDFLib.rgb(0.42, 0.45, 0.5);
+
+async function novDoc() {
+  const doc = await PDFLib.PDFDocument.create();
+  doc.registerFontkit(window.fontkit);
+  FONT_BYTES ||= b64(window.VS_PISAVA);
+  return { doc, font: await doc.embedFont(FONT_BYTES, { subset: true }) };
+}
+function wrap(font, s, sz, w) {
+  const out = [];
+  for (const par of String(s ?? '').split('\n')) {
+    let line = '';
+    for (const word of par.split(/\s+/).filter(Boolean)) {
+      const t = line ? line + ' ' + word : word;
+      if (line && font.widthOfTextAtSize(t, sz) > w) { out.push(line); line = word; } else line = t;
+    }
+    out.push(line);
+  }
+  return out;
+}
+// Preprost pisec besedila po straneh A4.
+function pisec(doc, font) {
+  const W = { page: null, y: 0 };
+  const W0 = A4[0] - ML - MR;
+  W.nova = () => { W.page = doc.addPage(A4); W.y = A4[1] - 64; };
+  W.prostor = h => { if (!W.page || W.y - h < 60) W.nova(); };
+  W.txt = (s, o = {}) => {
+    const sz = o.sz || 10.5, lh = sz * 1.38, x = ML + (o.ind || 0), w = W0 - (o.ind || 0);
+    for (const line of wrap(font, s, sz, w)) {
+      W.prostor(lh);
+      const dx = o.center ? (w - font.widthOfTextAtSize(line, sz)) / 2 : 0;
+      W.page.drawText(line, { x: x + dx, y: W.y - sz, size: sz, font, color: o.gray ? GRAY() : INK() });
+      W.y -= lh;
+    }
+    W.y -= o.after ?? 4;
+  };
+  W.naslov = (s, sz = 13) => { W.prostor(sz * 3); W.y -= 6; W.txt(s, { sz, after: 6 }); };
+  W.crta = (x0, x1) => { W.page.drawLine({ start: { x: x0, y: W.y }, end: { x: x1, y: W.y }, thickness: 0.6, color: GRAY() }); };
+  // Tabela: kv = [[oznaka, vrednost], ...]
+  W.kv = (rows, lw = 190) => {
+    for (const [k, v] of rows) {
+      if (!String(v ?? '').trim()) continue;
+      const lines = wrap(font, v, 10, W0 - lw), h = lines.length * 13.8 + 2;
+      W.prostor(h);
+      W.page.drawText(k, { x: ML, y: W.y - 10, size: 9.5, font, color: GRAY() });
+      lines.forEach((l, i) => W.page.drawText(l, { x: ML + lw, y: W.y - 10 - i * 13.8, size: 10, font, color: INK() }));
+      W.y -= h;
+    }
+    W.y -= 4;
+  };
+  W.tabela = (glava, vrste, sir) => {
+    const sz = 9, rh = 15, xs = []; let x = ML; for (const s of sir) { xs.push(x); x += s * W0; }
+    const vrsta = (cells, g) => {
+      W.prostor(rh + 2);
+      cells.forEach((t, i) => {
+        let s = String(t ?? ''); const mw = sir[i] * W0 - 6;
+        while (s.length > 1 && font.widthOfTextAtSize(s, sz) > mw) s = s.slice(0, -2) + '…';
+        W.page.drawText(s, { x: xs[i] + 2, y: W.y - sz - 2, size: sz, font, color: g ? GRAY() : INK() });
+      });
+      W.y -= rh; W.crta(ML, ML + W0); W.y -= 2;
+    };
+    vrsta(glava, true); vrste.forEach(r => vrsta(r)); W.y -= 6;
+  };
+  W.W0 = W0;
+  return W;
+}
+
+async function genPooblastilo(c) {
+  const { doc, font } = await novDoc(), W = pisec(doc, font), iz = S.izvajalec, im = c.im, PO = im.tip === 'po';
+  const kaj = join([c.vrste.d && 'naprave za individualno samooskrbo (sončne elektrarne)', c.vrste.f && 'hranilnika električne energije'], ' in ');
+  const mmTxt = c.mm.obstojece && /^4-\d+$/.test(c.mm.st.replace(/\s/g, '')) ? `na merilnem mestu št. ${c.mm.st.replace(/\s/g, '')}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}, ` : '';
+  W.nova(); W.y -= 20;
+  W.txt('POOBLASTILO', { sz: 18, center: true, after: 22 });
+  W.txt('Pooblastitelj (uporabnik / investitor):', { sz: 9.5, gray: true, after: 2 });
+  W.txt(join([PO ? im.naziv : join([im.ime, im.priimek], ' '), naslov(im)]) || '________________________________________________', { after: 2 });
+  W.txt(`davčna številka: ${im.davcna || '______________'}`, { after: 16 });
+  W.txt('pooblašča', { center: true, after: 14 });
+  W.txt('Pooblaščenca:', { sz: 9.5, gray: true, after: 2 });
+  W.txt(join([iz.naziv, naslov(iz)]), { after: 2 });
+  W.txt(join([`davčna številka: ${iz.davcna}`, iz.maticna && `matična številka: ${iz.maticna}`]), { after: 16 });
+  W.txt(`da v imenu pooblastitelja pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj || 'naprave'} ${mmTxt}na lokaciji ${lokacija(c) || '________________________'}${c.mm.ko || c.mm.parcele ? ` (k.o. ${c.mm.ko || '____'}, parc. št. ${c.mm.parcele || '____'})` : ''}, ter v tem postopku:`, { after: 6 });
+  for (const t of ['posreduje podatke in priloge ter vlogo po potrebi dopolni,', 'prejema obvestila, pozive in dokumente, povezane z vlogo, vključno s soglasjem za priključitev,', 'daje izjave in potrjuje pogoje, ki so del oddaje vloge.'])
+    W.txt('–  ' + t, { ind: 14, after: 3 });
+  W.y -= 8;
+  W.txt('Pooblastitelj izjavlja, da je seznanjen s Politiko zasebnosti družb ELES, d.o.o. in Elektro Maribor, d.d. ter s klavzulami o varstvu osebnih podatkov na Enotni vlogi, da so podatki v vlogi točni in resnični ter da dovoljuje, da se njegovi osebni podatki zbirajo, hranijo, obdelujejo, uporabljajo in posredujejo za potrebe izvedbe vseh potrebnih postopkov.', { after: 8 });
+  W.txt('Pooblastilo velja do pravnomočnosti soglasja za priključitev oziroma do pisnega preklica.', { after: 30 });
+  const podpisi = [[PO ? 'Pooblastitelj (podpis in žig)' : 'Pooblastitelj (podpis)', PO ? im.naziv : join([im.ime, im.priimek], ' ')]];
+  if (im.solastniki) {
+    const imena = im.solastnikiImena.split(',').map(s => s.trim()).filter(Boolean);
+    (imena.length ? imena : ['', '']).forEach(n => podpisi.push(['Solastnik (soglaša s postavitvijo naprave in z vlogo)', n]));
+  }
+  W.prostor(60);
+  W.page.drawText('Kraj in datum: ________________________________', { x: ML, y: W.y - 10, size: 10.5, font, color: INK() });
+  W.y -= 46;
+  for (const [vloga, ime] of podpisi) {
+    W.prostor(56);
+    W.crta(A4[0] - MR - 230, A4[0] - MR); W.y -= 4;
+    W.page.drawText(vloga, { x: A4[0] - MR - 230, y: W.y - 9, size: 8.5, font, color: GRAY() });
+    if (ime) W.page.drawText(ime, { x: A4[0] - MR - 230, y: W.y - 21, size: 9.5, font, color: INK() });
+    W.y -= 50;
+  }
+  return doc.save();
+}
+
+// Slika -> JPEG z največ maxPx po daljši stranici (manjša datoteka).
+async function slikaJpeg(file, maxPx = 1800, q = 0.82) {
+  const bmp = await createImageBitmap(file), sc = Math.min(1, maxPx / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * sc); cv.height = Math.round(bmp.height * sc);
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', q));
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), w: cv.width, h: cv.height };
+}
+async function dodajDatoteko(doc, font, file, oznaka) {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (isPdf) {
+    const src = await PDFLib.PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    const pages = await doc.copyPages(src, src.getPageIndices());
+    pages.forEach(p => doc.addPage(p));
+    return pages.length;
+  }
+  const j = await slikaJpeg(file), img = await doc.embedJpg(j.bytes);
+  const land = j.w > j.h, size = land ? [A4[1], A4[0]] : A4, pg = doc.addPage(size);
+  const mx = 30, top = 44, sc = Math.min((size[0] - 2 * mx) / j.w, (size[1] - top - mx) / j.h);
+  pg.drawText(oznaka, { x: mx, y: size[1] - 28, size: 9, font, color: GRAY() });
+  pg.drawImage(img, { x: (size[0] - j.w * sc) / 2, y: size[1] - top - j.h * sc, width: j.w * sc, height: j.h * sc });
+  return 1;
+}
+async function genTehDoc(c) {
+  const { doc, font } = await novDoc(), W = pisec(doc, font), m = moci(c), im = c.im, iz = S.izvajalec, f = fs(c);
+  const L = lok(c), el = c.el, hr = c.hr;
+  W.nova();
+  W.txt(c.vrste.d ? 'TEHNIČNA DOKUMENTACIJA ZA IZVEDBO NAPRAVE ZA SAMOOSKRBO' : 'IDEJNA ZASNOVA VKLJUČITVE HRANILNIKA ELEKTRIČNE ENERGIJE', { sz: 14, after: 2 });
+  if (c.vrste.d && c.vrste.f) W.txt('z idejno zasnovo vključitve hranilnika električne energije v interno električno inštalacijo', { sz: 10.5, gray: true, after: 2 });
+  W.txt(`Priloga k Enotni vlogi za izdajo soglasja za priključitev – ${DIST.ime}`, { sz: 9.5, gray: true, after: 14 });
+
+  W.naslov('1. Investitor in lokacija', 11.5);
+  W.kv([
+    ['Uporabnik (investitor)', join([uporabnik(c), naslov(im)])],
+    ['Lokacija naprave', lokacija(c)],
+    ['Katastrska občina, parcela', join([c.mm.ko, c.mm.parcele && 'parc. št. ' + c.mm.parcele])],
+    ['Merilno mesto', c.mm.obstojece ? join([c.mm.st !== '4-' && c.mm.st, c.mm.gsrn && 'GSRN ' + c.mm.gsrn]) : 'novo merilno mesto'],
+    ['Priključna moč odjema MM', c.mm.pmOdjem ? `${fmtN(num(c.mm.pmOdjem))} kW` : '']
+  ]);
+
+  if (c.vrste.d) {
+    W.naslov('2. Naprava za samooskrbo', 11.5);
+    W.kv([
+      ['Vrsta naprave', join([el.naziv || R().nazivNaprave, 'naprava za individualno samooskrbo'], ' – ')],
+      ['Proizvodni vir', OPC.vir[el.vir]],
+      ['Način vključevanja v DS', OPC.shema[el.shema]],
+      ['Način obratovanja', join([OPC.obratovanje[el.obratovanje], OPC.nacin[el.nacin]])],
+      ['FN moduli', m.kwp ? `${el.panelKos} × ${el.panelModel || 'FN modul'} ${el.panelWp} Wp = ${fmtN(m.kwp, 3)} kWp` : ''],
+      ['Instalirana moč razsmernikov', m.kva ? `${fmtN(m.kva)} kVA` : ''],
+      ['Priključna moč oddaje', join([`obstoječa ${fmtN(num(el.pmObstojeca))} kW`, el.pmNova && `nova ${fmtN(num(el.pmNova))} kW`])],
+      ['Predvidena letna proizvodnja', m.letno ? `${fmtN(m.letno, 0)} kWh (za lastne potrebe ${fmtN(m.lastne, 0)} kWh, za oddajo v omrežje ${fmtN(m.oddaja, 0)} kWh)` : '']
+    ]);
+    if (m.rs.length) {
+      W.txt('Razsmerniki', { sz: 10, gray: true, after: 2 });
+      W.tabela(['Proizvajalec', 'Model', 'Enot', 'Moč enote', 'Napetost', 'Faze', 'Vrsta'],
+        m.rs.map(r => [r.proizvajalec, r.model, kos(r), `${fmtN(num(r.kva))} kVA`, `${napetost(r)} V`, r.faze, 'fotonapetostni']), [0.18, 0.28, 0.07, 0.13, 0.11, 0.08, 0.15]);
+    }
+  }
+  if (c.vrste.f && m.hee.length) {
+    W.naslov(`${c.vrste.d ? 3 : 2}. Hranilnik električne energije`, 11.5);
+    W.kv([
+      ['Skupna kapaciteta', `${fmtN(m.heeKwh)} kWh`],
+      ['Največja moč polnjenja / praznjenja', `${fmtN(m.heeP)} kW / ${fmtN(m.heeO)} kW`],
+      ['Priključna shema', OPC.shema[hr.shema]],
+      ['Način obratovanja', join([OPC.obratovanje[hr.obratovanje], OPC.nacin[hr.nacin]])],
+      ['Vključitev', 'v interno električno inštalacijo objekta za merilnim mestom']
+    ]);
+    W.tabela(['Proizvajalec', 'Model', 'Enot', 'Tehnol.', 'kWh', 'kW polnj.', 'kW prazn.', 'Faze'],
+      m.hee.map(h => [h.proizvajalec, h.model, kos(h), OPC.tehnologija[h.tehnologija] || h.tehnologija, fmtN(num(h.kwh)), fmtN(num(h.kwP)), fmtN(num(h.kwO || h.kwP)), h.faze]), [0.17, 0.25, 0.07, 0.1, 0.1, 0.11, 0.11, 0.09]);
+  }
+  const enop = f.enopolna || [], listi = f.listi || [];
+  W.naslov(`${1 + (c.vrste.d ? 1 : 0) + (c.vrste.f && m.hee.length ? 1 : 0) + 1}. Priloge`, 11.5);
+  const sez = [...enop.map(x => 'Enopolna shema z vrisano točko priključitve v interno NN omrežje – ' + x.name), ...listi.map(x => 'Tehnični list – ' + x.name)];
+  if (sez.length) sez.forEach((t, i) => W.txt(`${i + 1}. ${t}`, { ind: 6, after: 2 }));
+  else W.txt('(enopolna shema in tehnični listi niso priloženi)', { gray: true });
+  W.y -= 18;
+  W.txt(`Pripravil: ${join([iz.naziv, naslov(iz)])}${iz.kontakt ? `, ${iz.kontakt}` : ''}`, { sz: 9.5, gray: true, after: 2 });
+  W.txt(`Datum: ${fmtD(today())}`, { sz: 9.5, gray: true });
+  const napake = [];
+  for (const x of enop) { try { await dodajDatoteko(doc, font, x, 'Enopolna shema'); } catch (err) { console.error(err); napake.push(x.name); } }
+  for (const x of listi) { try { await dodajDatoteko(doc, font, x, 'Tehnični list'); } catch (err) { console.error(err); napake.push(x.name); } }
+  return { bytes: await doc.save(), napake };
+}
+async function pripraviTeh(c) {
+  if (!pdfReady()) { toast('Knjižnice za PDF niso naložene.'); return false; }
+  try {
+    toast('Pripravljam tehnično dokumentacijo …');
+    const { bytes, napake } = await genTehDoc(c);
+    TEHDOC[c.id] = { name: `${fileBase(c)}_tehnicna_dokumentacija.pdf`, bytes, size: bytes.length };
+    if (napake.length) toast(`Teh datotek ni bilo mogoče dodati: ${napake.join(', ')}.`);
+    else if (bytes.length > MAX_DAT) toast(`Pozor: ${fmtMB(bytes.length)} – spletni obrazec sprejme največ 4 MB.`);
+    return true;
+  } catch (err) { console.error(err); toast('Tehnične dokumentacije ni bilo mogoče pripraviti.'); return false; }
+}
+
+let PV = null; // { name, bytes, url }
+async function showPdf(c, kaj) {
+  if (!pdfReady()) return toast('Knjižnice za PDF niso naložene.');
+  try {
+    let name, bytes, title;
+    if (kaj === 'poob') { bytes = await genPooblastilo(c); name = `${fileBase(c)}_pooblastilo_za_podpis.pdf`; title = 'Pooblastilo za podpis'; }
+    else { if (!await pripraviTeh(c)) return; ({ name, bytes } = TEHDOC[c.id]); title = `Tehnična dokumentacija (${fmtMB(bytes.length)})`; renderEdit(); }
+    closePreview();
+    PV = { name, bytes, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) };
+    $('#pvTitle').textContent = title;
+    $('#pvFrame').src = PV.url; $('#pvOpen').href = PV.url;
+    $('#pv').hidden = false;
+  } catch (err) { console.error(err); toast('Dokumenta ni bilo mogoče pripraviti.'); }
+}
+function closePreview() {
+  $('#pv').hidden = true; $('#pvFrame').src = 'about:blank';
+  if (PV) URL.revokeObjectURL(PV.url); PV = null;
+}
+
+render();
+</script>
+</body>
+</html>
