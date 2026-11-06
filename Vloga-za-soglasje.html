@@ -784,7 +784,7 @@ function renderEdit() {
       <div class="pril"><div><b>Pooblastilo investitorja</b> <span class="pill">podpiše stranka</span></div>
         <div class="row" style="gap:6px"><button class="sm pri" data-act="genPoob"${pdfReady() ? '' : ' disabled'}>Pokaži pooblastilo za podpis</button><label class="btn sm">Podpisano<input type="file" multiple hidden data-act="file" data-k="pooblastilo"></label></div>
         <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}Vsebuje tudi izjavo, da je stranka seznanjena s klavzulami o varstvu osebnih podatkov${c.im.solastniki ? ' in mesta za podpise solastnikov' : ''}.</div></div>
-      ${pril('enopolna')}
+      ${pril('enopolna', '<button class="sm" data-act="enoCp" title="Podatki za izdelavo enopolne sheme – tudi če vloga še ni izpolnjena">Kopiraj podatke</button><button class="sm" data-act="enoTxt">Prenesi .txt</button><button class="sm" data-act="enoJson">Prenesi .json</button>')}
       ${pril('listi')}
       <div class="pril"><div><b>Tehnična dokumentacija (PDF)</b> <span class="pill">pripravi orodje</span></div>
         <div class="row" style="gap:6px"><button class="sm pri" data-act="genTeh"${pdfReady() ? '' : ' disabled'}>Pripravi in pokaži</button></div>
@@ -1027,6 +1027,9 @@ document.addEventListener('click', async e => {
     case 'copyMail': await copyText($('#mailBody').value); toast('Besedilo kopirano.'); break;
     case 'mailto': location.href = `mailto:${encodeURIComponent(c.im.email || '')}?subject=${encodeURIComponent($('#mailSubj').value)}&body=${encodeURIComponent($('#mailBody').value)}`; break;
     case 'vPriklop': izvoziPriklop(c); break;
+    case 'enoCp': await copyText(besediloEnopolna(c)); toast('Podatki za enopolno shemo kopirani.'); break;
+    case 'enoTxt': download(`${fileBase(c)}_podatki_enopolna.txt`, besediloEnopolna(c), 'text/plain;charset=utf-8'); break;
+    case 'enoJson': download(`${fileBase(c)}_podatki_enopolna.json`, JSON.stringify(podatkiEnopolna(c), null, 2), 'application/json'); break;
     case 'pvDl': if (PV) download(PV.name, new Blob([PV.bytes], { type: 'application/pdf' })); break;
     case 'pvClose': closePreview(); break;
     case 'katAdd': S.katalog[b.dataset.k].push(b.dataset.k === 'razsmerniki' ? { proizvajalec: '', model: '', kva: '', faze: '3f' } : { proizvajalec: '', model: '', tehnologija: 'LFP', kwh: '', kwP: '', kwO: '', faze: '3f' }); saveSettings(); renderSettings(); break;
@@ -1074,6 +1077,64 @@ $('#importKat').addEventListener('change', async e => {
 });
 
 /* ---------- izvoz v Vloga-priklop ---------- */
+/* ---------- izvoz podatkov za enopolno shemo (tudi nedokončana vloga) ---------- */
+function podatkiEnopolna(c) {
+  const m = moci(c), L = lok(c), n = v => num(v) || null, mmSt = c.mm.st.replace(/\s/g, '');
+  const d = {
+    orodje: 'vloga-za-soglasje', namen: 'podatki za enopolno shemo', izvoz: today(),
+    uporabnik: { naziv: uporabnik(c) || null, naslov: naslov(c.im) || null, tel: c.im.tel || null, email: c.im.email || null },
+    lokacija: { naslov: lokacija(c) || null, katastrskaObcina: c.mm.ko || null, parcele: c.mm.parcele || null },
+    merilnoMesto: {
+      obstojece: !!c.mm.obstojece, stevilka: /^4-\d+$/.test(mmSt) ? mmSt : null, gsrn: c.mm.gsrn.replace(/\s/g, '') || null,
+      prikljucnaMocOdjemaKw: n(c.mm.pmOdjem)
+    },
+    elektrarna: c.vrste.d ? {
+      naziv: c.el.naziv || R().nazivNaprave, vir: OPC.vir[c.el.vir], shema: OPC.shema[c.el.shema], nacinObratovanja: obrTxt(c.el.obr) || null,
+      fnModuli: { model: c.el.panelModel || null, kos: n(c.el.panelKos), mocWp: n(c.el.panelWp), skupajKwp: m.kwp ? Math.round(m.kwp * 1000) / 1000 : null },
+      razsmerniki: m.rs.map(r => ({ proizvajalec: r.proizvajalec || null, model: r.model || null, kos: kos(r), mocKva: n(r.kva), faze: r.faze, napetostV: napetost(r) })),
+      instaliranaMocKva: m.kva || null,
+      prikljucnaMocOddajeKw: { obstojeca: num(c.el.pmObstojeca), nova: n(c.el.pmNova) },
+      letnaProizvodnjaKwh: m.letno ? { skupaj: Math.round(m.letno), lastnePotrebe: Math.round(m.lastne), oddaja: Math.round(m.oddaja) } : null
+    } : null,
+    hranilnik: c.vrste.f ? {
+      shema: OPC.shema[c.hr.shema], nacinObratovanja: obrTxt(c.hr.obr) || null,
+      enote: m.hee.map(h => ({ proizvajalec: h.proizvajalec || null, model: h.model || null, kos: kos(h), tehnologija: OPC.tehnologija[h.tehnologija] || h.tehnologija, kapacitetaKwh: n(h.kwh), mocPolnjenjaKw: n(h.kwP), mocPraznjenjaKw: n(h.kwO || h.kwP), faze: h.faze, napetostV: napetost(h) })),
+      skupaj: m.hee.length ? { kapacitetaKwh: m.heeKwh, mocPolnjenjaKw: m.heeP, mocPraznjenjaKw: m.heeO } : null
+    } : null
+  };
+  d.manjka = [
+    !d.uporabnik.naziv && 'uporabnik', !d.lokacija.naslov && 'naslov lokacije',
+    c.mm.obstojece && !d.merilnoMesto.stevilka && 'številka merilnega mesta', !d.merilnoMesto.prikljucnaMocOdjemaKw && 'priključna moč odjema',
+    c.vrste.d && !m.kwp && 'FN moduli (število, moč)', c.vrste.d && !m.rs.length && 'razsmernik',
+    c.vrste.d && !num(c.el.pmNova) && 'nova priključna moč oddaje', c.vrste.f && !m.hee.length && 'hranilnik'
+  ].filter(Boolean);
+  return d;
+}
+function besediloEnopolna(c) {
+  const d = podatkiEnopolna(c), e = d.elektrarna, h = d.hranilnik, v = (x, en = '') => x == null || x === '' ? '—' : `${typeof x === 'number' ? fmtN(x, 3) : x}${en}`;
+  const L = [`PODATKI ZA ENOPOLNO SHEMO – ${v(d.uporabnik.naziv)}`, `Izvoz: ${fmtD(d.izvoz)}${d.manjka.length ? ' (vloga še ni izpolnjena do konca)' : ''}`, '',
+    `Uporabnik: ${v(join([d.uporabnik.naziv, d.uporabnik.naslov]))}`,
+    `Lokacija: ${v(d.lokacija.naslov)}`,
+    `K.o. / parcela: ${v(join([d.lokacija.katastrskaObcina, d.lokacija.parcele && 'parc. št. ' + d.lokacija.parcele]))}`,
+    `Merilno mesto: ${d.merilnoMesto.obstojece ? v(join([d.merilnoMesto.stevilka, d.merilnoMesto.gsrn && 'GSRN ' + d.merilnoMesto.gsrn])) : 'novo merilno mesto'}`,
+    `Priključna moč odjema: ${v(d.merilnoMesto.prikljucnaMocOdjemaKw, ' kW')}`];
+  if (e) {
+    L.push('', 'ELEKTRARNA', `Shema: ${v(e.shema)}`, `Način obratovanja: ${v(e.nacinObratovanja)}`,
+      `FN moduli: ${e.fnModuli.kos || e.fnModuli.model ? `${v(e.fnModuli.kos)} × ${v(e.fnModuli.model)} ${v(e.fnModuli.mocWp, ' Wp')} = ${v(e.fnModuli.skupajKwp, ' kWp')}` : '—'}`,
+      'Razsmerniki:', ...(e.razsmerniki.length ? e.razsmerniki.map(r => `  - ${r.kos} × ${v(join([r.proizvajalec, r.model], ' '))}, ${v(r.mocKva, ' kVA')}, ${r.faze}, ${r.napetostV} V`) : ['  —']),
+      `Instalirana moč: ${v(e.instaliranaMocKva, ' kVA')}`,
+      `Priključna moč oddaje: obstoječa ${v(e.prikljucnaMocOddajeKw.obstojeca, ' kW')}, nova ${v(e.prikljucnaMocOddajeKw.nova, ' kW')}`,
+      `Letna proizvodnja: ${e.letnaProizvodnjaKwh ? `${e.letnaProizvodnjaKwh.skupaj} kWh (lastne ${e.letnaProizvodnjaKwh.lastnePotrebe}, oddaja ${e.letnaProizvodnjaKwh.oddaja})` : '—'}`);
+  }
+  if (h) {
+    L.push('', 'HRANILNIK', `Shema: ${v(h.shema)}`, `Način obratovanja: ${v(h.nacinObratovanja)}`,
+      ...(h.enote.length ? h.enote.map(x => `  - ${x.kos} × ${v(join([x.proizvajalec, x.model], ' '))}, ${x.tehnologija}, ${v(x.kapacitetaKwh, ' kWh')}, polnjenje ${v(x.mocPolnjenjaKw, ' kW')}, praznjenje ${v(x.mocPraznjenjaKw, ' kW')}, ${x.faze}, ${x.napetostV} V`) : ['  —']),
+      ...(h.skupaj ? [`Skupaj: ${v(h.skupaj.kapacitetaKwh, ' kWh')}, ${v(h.skupaj.mocPolnjenjaKw, ' kW')} / ${v(h.skupaj.mocPraznjenjaKw, ' kW')}`] : []));
+  }
+  if (d.manjka.length) L.push('', `Še manjka: ${d.manjka.join(', ')}`);
+  return L.join('\n');
+}
+
 function izvoziPriklop(c) {
   const m = moci(c), L = lok(c);
   const vloga = {
