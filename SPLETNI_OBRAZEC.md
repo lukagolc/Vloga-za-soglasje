@@ -55,7 +55,7 @@ Koraki (ob izbiri 4 + 6, pooblaščenec):
 - Proizvodni vir energije * (verjetno odvisen od vrste – ŠE NEZNANO)
 - gumb: Podatki o lokaciji so enaki uporabnikovemu naslovu (Kopiraj/Prenesi)
 - Kraj, Naslov (ulica/naselje) *, Hišna številka *, Pošta * (iskalnik)
-- Katastrska občina * (iskalnik), Parcelna številka * (več ločiti z vejico)
+- Katastrska občina * (iskalnik), Parcelna številka * (več ločiti z vejico) – orodje: prva KO tu, ostale po vklopu stikala
 - stikalo: Objekt se nahaja v več kot eni katastrski občini
 - Predvideno leto priključitve * (spustni seznam)
 ### Priključna moč proizvodne naprave

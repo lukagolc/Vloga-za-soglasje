@@ -116,7 +116,7 @@ tr.click:hover td{background:var(--chip)}
 <input type="file" id="importKat" accept="application/json,.json" hidden>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="lib/fontkit.umd.min.js"></script>
-<script src="lib/pisava.js"></script>
+<script src="lib/viri.js"></script>
 <script>
 'use strict';
 
@@ -204,8 +204,8 @@ const PRILOGE = {
 /* ---------- privzete nastavitve ---------- */
 const DEFAULTS = {
   izvajalec: {
-    naziv: 'ENSET d.o.o.', ulica: 'Kraigherjeva', hs: '22', kraj: '', posta: '2230 Lenart', davcna: '55426310', maticna: '9304207000',
-    zastopnik: 'Jure Hundrič', kontakt: '', tel: '', email: '', podpis: ''
+    naziv: 'ENSET d.o.o.', ulica: 'Kraigherjeva ulica', hs: '22', kraj: '', posta: '2230 Lenart v Slovenskih goricah', davcna: '55426310', maticna: '9304207000',
+    zastopnik: 'Jure Hundrič', kontakt: '', tel: '0597 77 888', email: 'info@enset.si', splet: 'enset.si', podpis: ''
   },
   rules: {
     kontaktNas: true,     // kontaktna oseba v vlogi smo mi (na naš e-naslov pride potrdilo in številka vloge)
@@ -271,6 +271,7 @@ function lsSet(k, v) {
   catch (e) { toast('Shranjevanje v brskalnik ni uspelo – naredite izvoz (varnostno kopijo).'); return false; }
 }
 let S = merge(DEFAULTS, lsGet(LS_SET));
+for (const k of ['tel', 'email', 'splet']) if (!S.izvajalec[k]) S.izvajalec[k] = DEFAULTS.izvajalec[k];
 let CASES = lsGet(LS_CASES) || [];
 const FILES = {}; // caseId -> { kljucPriloge: [File] } – samo v tej seji
 let state = { view: 'list', id: null, tpl: null };
@@ -278,15 +279,20 @@ let saveT;
 const saveCases = () => { clearTimeout(saveT); saveT = setTimeout(() => lsSet(LS_CASES, CASES), 250); };
 const saveSettings = () => lsSet(LS_SET, S);
 
+const newParcela = (ko = '') => ({ ko, st: '', lastniki: { u: true } });
+const newLastnik = () => ({ id: uid(), tip: 'fo', ime: '', priimek: '', naziv: '', ulica: '', hs: '', posta: '', davcna: '' });
 const newRs = () => ({ proizvajalec: '', model: '', kva: '', kos: 1, faze: '3f', napetost: '', sodo: false });
 const newHee = () => ({ proizvajalec: '', model: '', tehnologija: 'LFP', kwh: '', kwP: '', kwO: '', kos: 1, faze: '3f', napetost: '', sodo: false });
 function newCase() {
   return {
     id: uid(), created: today(), updated: today(), status: 'priprava',
     vrste: { d: true, f: false },
-    im: { tip: 'fo', ime: '', priimek: '', naziv: '', ulica: '', hs: '', kraj: '', posta: '', davcna: '', zavezanec: false, solastniki: false, solastnikiImena: '', tel: '', email: '' },
+    im: { tip: 'fo', ime: '', priimek: '', naziv: '', ulica: '', hs: '', kraj: '', posta: '', davcna: '', zavezanec: false, tel: '', email: '' },
+    // Parcele in lastniki: vsak lastnik (tudi uporabnik, id 'u') podpiše svoje pooblastilo.
+    parcele: [newParcela()],
+    lastniki: [],
     plTretja: false,
-    mm: { obstojece: true, st: '4-', gsrn: '', pmOdjem: '', enako: true, ulica: '', hs: '', kraj: '', posta: '', ko: '', parcele: '', vecKo: false, leto: String(new Date().getFullYear()), predhodna: '' },
+    mm: { obstojece: true, st: '4-', gsrn: '', pmOdjem: '', enako: true, ulica: '', hs: '', kraj: '', posta: '', leto: String(new Date().getFullYear()), predhodna: '' },
     el: { naziv: '', vir: 'sonce', panelModel: '', panelKos: '', panelWp: '', pmObstojeca: '0', pmNova: '', shema: 'PS.3A', obr: { M: true }, sistemske: false, letno: '', lastne: '' },
     rs: [newRs()],
     hr: { shema: 'PS.3A', obr: { M: true }, sistemske: false, predhodnoSzp: '' },
@@ -300,8 +306,31 @@ const cur = () => CASES.find(c => c.id === state.id);
 CASES = CASES.map(c => {
   const n = merge(newCase(), c);
   for (const x of [n.el, n.hr]) { delete x.obratovanje; delete x.nacin; } // stari zapis (dve ločeni izbiri)
+  // stari zapis: ena KO in parcele, ločene z vejico; solastniki kot imena
+  if (c.mm && (c.mm.parcele || c.mm.ko) && !(c.parcele || []).some(x => x.st || x.ko)) {
+    const sol = String(c.im?.solastniki ? c.im.solastnikiImena || '' : '').split(',').map(x => x.trim()).filter(Boolean)
+      .map(ime => { const l = newLastnik(), d = ime.split(/\s+/); l.ime = d[0] || ''; l.priimek = d.slice(1).join(' '); return l; });
+    n.lastniki = sol;
+    const vsi = Object.fromEntries([['u', true], ...sol.map(l => [l.id, true])]);
+    n.parcele = String(c.mm.parcele || '').split(',').map(x => x.trim()).filter(Boolean).map(st => ({ ko: c.mm.ko || '', st, lastniki: { ...vsi } }));
+    if (!n.parcele.length) n.parcele = [{ ko: c.mm.ko || '', st: '', lastniki: { ...vsi } }];
+  }
+  delete n.mm.ko; delete n.mm.parcele; delete n.mm.vecKo; delete n.im.solastniki; delete n.im.solastnikiImena;
   return n;
 });
+// ---- parcele in lastniki ----
+const parc = c => c.parcele.filter(x => String(x.ko).trim() || String(x.st).trim());
+const koji = c => [...new Set(parc(c).map(x => String(x.ko).trim()).filter(Boolean))];
+const koTxt = c => koji(c).join(', ');
+const parceleTxt = (c, ko) => parc(c).filter(x => ko == null || String(x.ko).trim() === ko).map(x => String(x.st).trim()).filter(Boolean).join(', ');
+const parceleOpis = c => koji(c).length > 1 ? koji(c).map(k => `k.o. ${k}: parc. št. ${parceleTxt(c, k)}`).join('; ') : join([koTxt(c) && 'k.o. ' + koTxt(c), parceleTxt(c) && 'parc. št. ' + parceleTxt(c)]);
+const osebaIme = o => o.tip === 'po' ? (o.naziv || '') : join([o.ime, o.priimek], ' ');
+// Vse osebe: uporabnik (id 'u') in drugi lastniki.
+const osebe = c => [{ id: 'u', ...c.im, jeUporabnik: true }, ...c.lastniki];
+const parceleOd = (c, id) => parc(c).filter(x => x.lastniki && x.lastniki[id]);
+// Podpisniki pooblastil: uporabnik vedno, drugi lastniki, če imajo označeno vsaj eno parcelo.
+const podpisniki = c => osebe(c).filter(o => o.jeUporabnik || parceleOd(c, o.id).length);
+const vecLastnikov = c => parc(c).some(x => Object.values(x.lastniki || {}).filter(Boolean).length > 1) || podpisniki(c).length > 1;
 const obrTxt = o => join(Object.keys(OPC.obratovanje).filter(k => o && o[k]).map(k => OPC.obratovanje[k]), ' · ');
 const obrCb = p => `<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)">Način obratovanja (obkljukajte kot na obrazcu)<div class="row" style="gap:6px 18px;color:var(--fg)">${Object.entries(OPC.obratovanje).map(([k, t]) => cb(`${p}.${k}`, t)).join('')}</div></div>`;
 
@@ -358,7 +387,11 @@ function checks(c) {
   if (!postaRaz(im.posta).st) e('Pošta uporabnika: vpišite poštno številko in kraj (npr. 2230 Lenart).');
   if (!im.davcna) e('Manjka davčna številka uporabnika (na spletnem obrazcu je obvezna).');
   else if (!davcnaOk(im.davcna)) e('Davčna številka uporabnika ni veljavna.');
-  if (im.solastniki && !im.solastnikiImena.trim()) w('Nepremičnina ima več solastnikov – vpišite jih, da se na pooblastilo dodajo mesta za njihove podpise.');
+  c.lastniki.forEach((l, i) => {
+    if (!osebaIme(l)) e(`Lastnik ${i + 2}: manjka ime in priimek.`);
+    else if (!parceleOd(c, l.id).length) w(`${osebaIme(l)} nima označene nobene parcele – ne dobi pooblastila.`);
+    if (l.davcna && !davcnaOk(l.davcna)) e(`${osebaIme(l) || 'Lastnik ' + (i + 2)}: davčna številka ni veljavna.`);
+  });
   if (R().kontaktNas) { if (!iz.tel || !iz.email) e('V nastavitvah vpišite telefon in e-pošto (kontaktni podatki v vlogi).'); }
   else if (!im.tel || !im.email) e('Manjka telefon ali e-pošta uporabnika (kontaktni podatki v vlogi).');
   if (!iz.naziv || !iz.ulica || !iz.hs || !postaRaz(iz.posta).st) e('V nastavitvah dopolnite naziv in naslov pooblaščenca.');
@@ -367,8 +400,14 @@ function checks(c) {
   else if (!/^4-\d+$/.test(mm.st.replace(/\s/g, ''))) e('Številka merilnega mesta mora biti oblike 4-… (z računa za elektriko).');
   if (mm.gsrn && !gs1Ok(mm.gsrn)) e('GSRN merilnega mesta ni veljaven (18 števk, kontrolna števka se ne ujema).');
   if (!mm.enako && (!mm.ulica || !mm.hs || !postaRaz(mm.posta).st)) e('Manjka naslov lokacije naprave.');
-  if (!mm.ko) e('Manjka katastrska občina.');
-  if (!mm.parcele) e('Manjka parcelna številka.');
+  if (!parc(c).length) e('Vpišite parcelo (katastrska občina in parcelna številka).');
+  parc(c).forEach((x, i) => {
+    if (!String(x.ko).trim()) e(`Parcela ${i + 1}: manjka katastrska občina.`);
+    if (!String(x.st).trim()) e(`Parcela ${i + 1}: manjka parcelna številka.`);
+    if (!Object.values(x.lastniki || {}).some(Boolean)) w(`Parcela ${x.st || i + 1}: označite lastnika.`);
+  });
+  const nPod = podpisniki(c).length, nPodpisanih = (f.pooblastilo || []).length;
+  if (nPod > 1 && nPodpisanih && nPodpisanih < nPod) w(`Podpisanih pooblastil je ${nPodpisanih}, podpisnikov pa ${nPod}.`);
   if (!num(mm.pmOdjem)) w('Vpišite priključno moč odjema merilnega mesta (kW) – z računa ali iz soglasja (npr. 17 kW pri 3 × 25 A).');
   if (c.vrste.d) {
     if (!m.rs.length) e('Vpišite razsmernik.');
@@ -428,7 +467,7 @@ function koraki(c) {
   const u = [
     { sub: 'Podatki o uporabniku' },
     { l: 'Vrsta uporabnika', izb: PO ? 'Pravni subjekt' : 'Fizična oseba' },
-    { l: 'Ali ima nepremičnina več solastnikov', izb: im.solastniki ? 'Da' : 'Ne', h: im.solastniki ? 'Pooblastilo ima mesta za podpise solastnikov.' : '' },
+    { l: 'Ali ima nepremičnina več solastnikov', izb: vecLastnikov(c) ? 'Da' : 'Ne', h: vecLastnikov(c) ? `Pooblastila podpišejo: ${podpisniki(c).map(osebaIme).join(', ')}.` : '' },
     ...(PO ? [{ l: 'Naziv', v: im.naziv, r: true, h: 'Polja za pravni subjekt preverite na obrazcu.' }] : [{ l: 'Priimek', v: im.priimek, r: true }, { l: 'Ime', v: im.ime, r: true }]),
     { l: 'Kraj', v: im.kraj, h: 'Neobvezno – naselje, če je drugačno od pošte.' },
     { l: 'Naslov (ulica/naselje)', v: im.ulica, r: true },
@@ -448,7 +487,7 @@ function koraki(c) {
     { l: 'Podatki o kontaktni osebi so enaki podatkom o uporabniku', izb: R().kontaktNas ? 'izklopljeno' : 'vklopljeno', h: R().kontaktNas ? 'Kontakt smo mi – potrdilo in številka vloge prideta na naš e-naslov.' : '' },
     ...(R().kontaktNas ? [{ l: 'Kontaktna oseba', v: kontakt.o, r: true }, { l: 'Telefon', v: kontakt.t, r: true }, { l: 'E-mail', v: kontakt.e, r: true }] : []),
     { sub: 'Priloge' },
-    datRow('Pooblastilo investitorja', ['pooblastilo'], 'Podpisano pooblastilo (največ 4 MB).', true)
+    datRow('Pooblastilo investitorja', ['pooblastilo'], podpisniki(c).length > 1 ? `Naložite vsa podpisana pooblastila (${podpisniki(c).length}), vsako največ 4 MB.` : 'Podpisano pooblastilo (največ 4 MB).', true)
   ];
   out.push({ n: 'Podatki o uporabniku', v: u });
 
@@ -460,6 +499,14 @@ function koraki(c) {
     ? [{ l: gumb, izb: 'kliknite (Kopiraj/Prenesi)', h: 'Lokacija je na naslovu uporabnika.' }]
     : [{ l: 'Kraj', v: L.kraj }, { l: 'Naslov (ulica/naselje)', v: L.ulica, r: true }, { l: 'Hišna številka', v: L.hs, r: true },
        { l: 'Pošta', v: psL.st, r: true, h: psL.st ? `Iskalnik: vtipkajte ${psL.st} in izberite »${join([psL.st, psL.kraj], ' ')}«.` : '' }];
+  // Katastrska občina in parcele: prva KO v glavna polja, ostale po vklopu stikala.
+  const kk = koji(c), ko0 = kk[0] || '';
+  const koVrst = [
+    { l: 'Katastrska občina', v: ko0, r: true, h: 'Iskalnik: vtipkajte ime ali številko KO in izberite.' },
+    { l: 'Parcelna številka', v: parceleTxt(c, ko0) || parceleTxt(c), r: true, h: 'Več parcel ločite z vejico.' },
+    { l: 'Objekt se nahaja v več kot eni katastrski občini', izb: kk.length > 1 ? 'vklopljeno' : 'izklopljeno', h: kk.length > 1 ? 'Za ostale KO se pojavijo dodatna polja – preverite.' : '' },
+    ...kk.slice(1).flatMap(k => [{ l: 'Katastrska občina (dodatna)', v: k, r: true }, { l: 'Parcelna številka', v: parceleTxt(c, k), r: true }])
+  ];
   const mmVrst = [
     { l: 'Sprememba na obstoječem merilnem mestu', izb: mm.obstojece ? 'vklopljeno' : 'izklopljeno', h: mm.obstojece ? '' : 'Obrazec bo opozoril, da je treba izpolniti še vlogo za odjemalca.' },
     ...(mm.obstojece ? [
@@ -477,9 +524,7 @@ function koraki(c) {
       { l: 'Proizvodni vir energije', izb: OPC.vir[el.vir], r: true },
       { l: 'Moč fotonapetostnih modulov (kW)', v: cz(m.kwp, 3), h: 'Polje se pojavi po izbiri vira »sonce«.' },
       ...lokVrst('Podatki o lokaciji so enaki uporabnikovemu naslovu'),
-      { l: 'Katastrska občina', v: mm.ko, r: true, h: 'Iskalnik: vtipkajte ime ali številko KO in izberite.' },
-      { l: 'Parcelna številka', v: mm.parcele, r: true, h: 'Več parcel ločite z vejico.' },
-      { l: 'Objekt se nahaja v več kot eni katastrski občini', izb: mm.vecKo ? 'vklopljeno' : 'izklopljeno' },
+      ...koVrst,
       { l: 'Predvideno leto priključitve', izb: mm.leto, r: true },
       { sub: 'Priključna moč proizvodne naprave' },
       { l: 'Obstoječa (kW)', v: cn(el.pmObstojeca || 0), r: true },
@@ -529,8 +574,7 @@ function koraki(c) {
       { l: 'Na voljo za sistemske storitve', izb: hr.sistemske ? 'Da' : 'Ne', h: 'Če se pojavi.' },
       { sub: 'Katastrska občina in parcelna številka' },
       ...(c.vrste.d ? [{ l: 'Podatki o lokaciji so enaki podatkom na vlogi za soglasje', izb: 'kliknite (Kopiraj/Prenesi)' }]
-        : [{ l: 'Katastrska občina', v: mm.ko, r: true }, { l: 'Parcelna številka', v: mm.parcele, r: true }]),
-      { l: 'Objekt se nahaja v več kot eni katastrski občini', izb: mm.vecKo ? 'vklopljeno' : 'izklopljeno' },
+        : koVrst),
       { sub: 'Priloge' },
       tehRow('Idejna zasnova vključitve hranilnika el. energije v distribucijsko omrežje'),
       { info: 'Bančna garancija velja samo za hranilnike po shemi PS.1B z močjo 1 MW ali več.' }
@@ -559,7 +603,7 @@ function manjka(c) {
   if (!im.davcna) out.push('vašo davčno številko');
   if (mm.obstojece && !/^4-\d+$/.test(mm.st.replace(/\s/g, ''))) out.push('številko merilnega mesta (oblika 4-…, je na računu za elektriko)');
   if (!mm.gsrn) out.push('GSRN kodo merilnega mesta (18 števk, je na računu za elektriko), če jo imate pri roki');
-  if (!mm.ko || !mm.parcele) out.push('katastrsko občino in parcelno številko objekta');
+  if (!koTxt(c) || !parceleTxt(c)) out.push('katastrsko občino in parcelne številke (in kdo je lastnik posamezne parcele)');
   if (!num(mm.pmOdjem)) out.push('priključno moč merilnega mesta (na računu za elektriko)');
   return out;
 }
@@ -569,7 +613,7 @@ function fill(tpl, c) {
     uporabnik: uporabnik(c), naslov: naslov(c.im), lokacija: lokacija(c) || '—', mm: c.mm.st && c.mm.st !== '4-' ? c.mm.st : '—',
     naprava: napravaTxt(c) || '—', distributer: DIST.ime,
     st_vloge: c.oddaja.st ? `, številka vloge ${c.oddaja.st}` : '',
-    blok_solastniki: c.im.solastniki ? '\nKer ima nepremičnina več solastnikov, naj pooblastilo podpišejo tudi solastniki (mesta za podpis so na pooblastilu).' : '',
+    blok_solastniki: podpisniki(c).length > 1 ? `\nKer je lastnikov več, je v priponki za vsakega svoje pooblastilo – vsak naj podpiše svoje:\n${podpisniki(c).map(o => `  • ${osebaIme(o)}${parceleOd(c, o.id).length ? ` (parc. št. ${parceleOd(c, o.id).map(x => x.st).join(', ')})` : ''}`).join('\n')}` : '',
     blok_manjka: mk.length ? `Pošljite nam še:\n${mk.map(x => '  • ' + x).join('\n')}` : '',
     izvajalec: iz.naziv, podpis: iz.podpis || iz.naziv
   };
@@ -675,8 +719,6 @@ function renderEdit() {
     </div>
     <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
       ${PO ? cb('im.zavezanec', 'Davčni zavezanec') : ''}
-      ${cb('im.solastniki', 'Nepremičnina ima več solastnikov', true)}
-      ${c.im.solastniki ? `<label class="f">Solastniki (ime in priimek, ločite z vejico) – dobijo mesto za podpis na pooblastilu<input data-p="im.solastnikiImena" value="${esc(c.im.solastnikiImena)}"></label>` : ''}
       ${cb('plTretja', 'Plačnik stroškov priključevanja je tretja oseba (podatke vpišete ročno na obrazcu)')}
     </div></section>
 
@@ -686,12 +728,32 @@ function renderEdit() {
       ${c.mm.obstojece ? inp('mm.st', 'Številka merilnega mesta', { ph: '4-…' }) + inp('mm.gsrn', 'GSRN MM (neobvezno)', { ph: '18 števk' }) : ''}
       ${inp('mm.pmOdjem', 'Priključna moč odjema MM (kW)', { type: 'number', ph: 'npr. 17' })}
       ${inp('mm.predhodna', 'Št. informacije o možnosti priključitve', { ph: 'neobvezno (Moj Elektro)' })}
-      ${inp('mm.ko', 'Katastrska občina', { ph: 'npr. 532 Lenart' })}
-      ${inp('mm.parcele', 'Parcelna številka', { ph: 'več ločite z vejico' })}
       ${inp('mm.leto', 'Predvideno leto priključitve', { type: 'number' })}
     </div>
-    <div class="row" style="margin-top:8px;gap:18px">${cb('mm.enako', 'Naprava je na naslovu uporabnika', true)}${cb('mm.vecKo', 'Objekt je v več katastrskih občinah')}</div>
+    <div class="row" style="margin-top:8px;gap:18px">${cb('mm.enako', 'Naprava je na naslovu uporabnika', true)}</div>
     ${c.mm.enako ? '' : `<div class="grid" style="margin-top:8px">${inp('mm.ulica', 'Ulica / naselje')}${inp('mm.hs', 'Hišna številka')}${inp('mm.posta', 'Poštna številka in pošta', { ph: '2230 Lenart' })}${inp('mm.kraj', 'Kraj (če ni enak pošti)')}</div>`}
+    </section>
+
+    <section class="card"><h2>Parcele in lastniki</h2>
+    <p class="small muted" style="margin:0 0 8px">Za vsako parcelo obkljukajte, kdo je lastnik. Vsak lastnik podpiše svoje pooblastilo (uporabnik vedno).</p>
+    <div class="tbl-wrap"><table class="siroka"><thead><tr><th style="width:170px">Katastrska občina</th><th style="width:140px">Parcelna št.</th><th>Lastniki</th><th style="width:40px"></th></tr></thead><tbody>
+    ${c.parcele.map((x, i) => `<tr>
+      <td><input data-p="parcele.${i}.ko" value="${esc(x.ko)}" placeholder="npr. 532 Lenart"></td>
+      <td><input data-p="parcele.${i}.st" value="${esc(x.st)}" placeholder="npr. 123/4"></td>
+      <td><div class="row" style="gap:4px 14px">${osebe(c).map((o, j) => `<label class="c small"><input type="checkbox" data-p="parcele.${i}.lastniki.${o.id}"${x.lastniki && x.lastniki[o.id] ? ' checked' : ''}> <span data-ime="${o.id}">${esc(osebaIme(o) || (j ? 'lastnik ' + (j + 1) : 'uporabnik'))}</span></label>`).join('')}</div></td>
+      <td><button class="sm danger" data-act="delParc" data-i="${i}" title="Odstrani">✕</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="sm" style="margin-top:6px" data-act="addParc">+ Parcela</button>
+    <h3>Drugi lastniki (solastniki)</h3>
+    ${c.lastniki.length ? `<div class="tbl-wrap"><table class="siroka"><thead><tr><th>Ime</th><th>Priimek</th><th>Ulica / naselje</th><th style="width:60px">Hš.</th><th style="width:150px">Pošta</th><th style="width:100px">Davčna</th><th style="width:40px"></th></tr></thead><tbody>
+    ${c.lastniki.map((l, i) => `<tr>
+      <td><input data-p="lastniki.${i}.ime" value="${esc(l.ime)}"></td><td><input data-p="lastniki.${i}.priimek" value="${esc(l.priimek)}"></td>
+      <td><input data-p="lastniki.${i}.ulica" value="${esc(l.ulica)}"></td><td><input data-p="lastniki.${i}.hs" value="${esc(l.hs)}"></td>
+      <td><input data-p="lastniki.${i}.posta" value="${esc(l.posta)}" placeholder="2230 Lenart"></td><td><input data-p="lastniki.${i}.davcna" value="${esc(l.davcna)}" placeholder="neobvezno"></td>
+      <td><button class="sm danger" data-act="delLast" data-i="${i}" title="Odstrani">✕</button></td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="small muted" style="margin:0">Ni drugih lastnikov.</p>'}
+    <button class="sm" style="margin-top:6px" data-act="addLast">+ Lastnik</button>
+    <p class="small" style="margin:10px 0 0">Pooblastila: <b>${podpisniki(c).length}</b> – <span id="podpisnikiTxt">${esc(podpisniki(c).map(o => osebaIme(o) || '(brez imena)').join(', '))}</span></p>
     </section>
 
     ${c.vrste.d ? `<section class="card"><h2>4. Elektrarna (naprava za samooskrbo)</h2><div class="grid">
@@ -757,8 +819,8 @@ function renderEdit() {
 
     <section class="card"><h2>Priloge</h2>
       <div class="pril"><div><b>Pooblastilo investitorja</b> <span class="pill">podpiše stranka</span></div>
-        <div class="row" style="gap:6px"><button class="sm pri" data-act="genPoob"${pdfReady() ? '' : ' disabled'}>Pokaži pooblastilo za podpis</button><label class="btn sm">Podpisano<input type="file" multiple hidden data-act="file" data-k="pooblastilo"></label></div>
-        <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}Vsebuje tudi izjavo, da je stranka seznanjena s klavzulami o varstvu osebnih podatkov${c.im.solastniki ? ' in mesta za podpise solastnikov' : ''}.</div></div>
+        <div class="row" style="gap:6px"><button class="sm pri" data-act="genPoob"${pdfReady() ? '' : ' disabled'}>${podpisniki(c).length > 1 ? `Pokaži pooblastila (${podpisniki(c).length})` : 'Pokaži pooblastilo za podpis'}</button><label class="btn sm">Podpisano<input type="file" multiple hidden data-act="file" data-k="pooblastilo"></label></div>
+        <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}${podpisniki(c).length > 1 ? `Vsak lastnik dobi svoje pooblastilo (${podpisniki(c).length}) – naložite vsa podpisana. ` : ''}Vsebuje tudi izjavo o seznanjenosti s klavzulami o varstvu osebnih podatkov.</div></div>
       ${pril('enopolna', '<button class="sm" data-act="enoCp" title="Podatki za izdelavo enopolne sheme – tudi če vloga še ni izpolnjena">Kopiraj podatke</button><button class="sm" data-act="enoTxt">Prenesi .txt</button><button class="sm" data-act="enoJson">Prenesi .json</button>')}
       ${pril('listi')}
       <div class="pril"><div><b>Tehnična dokumentacija (PDF)</b> <span class="pill">pripravi orodje</span></div>
@@ -807,6 +869,8 @@ function updateDerived() {
   const kk = koraki(c), vse = kk.flatMap(k => k.v).filter(x => !x.sub && !x.info), ok = vse.filter(x => c.done[x.k]).length;
   const aside = $('#aside'); if (!aside) return;
   const oc = ocene(c);
+  osebe(c).forEach((o, j) => document.querySelectorAll(`[data-ime="${o.id}"]`).forEach(el => { el.textContent = osebaIme(o) || (j ? 'lastnik ' + (j + 1) : 'uporabnik'); }));
+  if ($('#podpisnikiTxt')) $('#podpisnikiTxt').textContent = podpisniki(c).map(o => osebaIme(o) || '(brez imena)').join(', ');
   document.querySelectorAll('[data-ocena]').forEach(el => { el.innerHTML = oceniBtn(el.dataset.ocena, oc[el.dataset.ocena]); });
   if ($('#oddajaKwh')) $('#oddajaKwh').value = m.letno ? Math.round(m.oddaja) : '';
   aside.innerHTML = `
@@ -885,7 +949,7 @@ function renderSettings() {
     ${f('izvajalec.naziv', 'Naziv podjetja')}${f('izvajalec.ulica', 'Ulica / naselje')}${f('izvajalec.hs', 'Hišna številka')}
     ${f('izvajalec.posta', 'Poštna številka in pošta')}${f('izvajalec.kraj', 'Kraj (če ni enak pošti)')}
     ${f('izvajalec.davcna', 'Davčna številka')}${f('izvajalec.maticna', 'Matična številka')}${f('izvajalec.zastopnik', 'Zastopnik')}
-    ${f('izvajalec.kontakt', 'Kontaktna oseba v vlogi')}${f('izvajalec.tel', 'Telefon')}${f('izvajalec.email', 'E-pošta')}
+    ${f('izvajalec.kontakt', 'Kontaktna oseba v vlogi')}${f('izvajalec.tel', 'Telefon')}${f('izvajalec.email', 'E-pošta')}${f('izvajalec.splet', 'Spletna stran (noga dokumentov)')}
   </div>
   <label class="c" style="margin-top:10px"><input type="checkbox" data-s="rules.kontaktNas"${R().kontaktNas ? ' checked' : ''}> Kontaktni podatki v vlogi so naši (potrdilo in številka vloge prideta na naš e-naslov)</label>
   <label class="f" style="margin-top:8px">Podpis v e-pošti<textarea data-s="izvajalec.podpis" rows="3">${esc(iz.podpis)}</textarea></label>
@@ -933,7 +997,7 @@ function onField(e) {
     const c = cur();
     setPath(c, t.dataset.p, t.type === 'checkbox' ? t.checked : t.value);
     c.updated = today(); saveCases();
-    if (t.dataset.p.startsWith('rs.') || t.dataset.p.startsWith('hee.') || t.dataset.p.startsWith('el.') || t.dataset.p.startsWith('im.') || t.dataset.p.startsWith('mm.')) delete TEHDOC[c.id];
+    if (/^(rs|hee|el|im|mm|parcele)\./.test(t.dataset.p)) delete TEHDOC[c.id];
     if (t.dataset.full) renderEdit(); else updateDerived();
   } else if (t.dataset.s) {
     setPath(S, t.dataset.s, t.type === 'checkbox' ? t.checked : (t.type === 'number' ? num(t.value) : t.value));
@@ -976,6 +1040,10 @@ document.addEventListener('click', async e => {
       if (confirm(`Izbrišem vlogo »${uporabnik(x) || 'brez imena'}«?`)) { CASES = CASES.filter(y => y.id !== x.id); delete FILES[x.id]; delete TEHDOC[x.id]; lsSet(LS_CASES, CASES); render(); }
       break;
     }
+    case 'addParc': c.parcele.push(newParcela(c.parcele.length ? c.parcele[c.parcele.length - 1].ko : '')); saveCases(); renderEdit(); break;
+    case 'delParc': c.parcele.splice(+b.dataset.i, 1); if (!c.parcele.length) c.parcele.push(newParcela()); delete TEHDOC[c.id]; saveCases(); renderEdit(); break;
+    case 'addLast': { const l = newLastnik(); c.lastniki.push(l); c.parcele.forEach(x => { (x.lastniki ||= {})[l.id] = true; }); saveCases(); renderEdit(); break; }
+    case 'delLast': { const [l] = c.lastniki.splice(+b.dataset.i, 1); c.parcele.forEach(x => { if (x.lastniki) delete x.lastniki[l.id]; }); saveCases(); renderEdit(); break; }
     case 'addRs': c.rs.push(newRs()); saveCases(); renderEdit(); break;
     case 'delRs': c.rs.splice(+b.dataset.i, 1); delete TEHDOC[c.id]; saveCases(); renderEdit(); break;
     case 'addHee': c.hee.push(newHee()); saveCases(); renderEdit(); break;
@@ -1005,7 +1073,7 @@ document.addEventListener('click', async e => {
     case 'enoCp': await copyText(besediloEnopolna(c)); toast('Podatki za enopolno shemo kopirani.'); break;
     case 'enoTxt': download(`${fileBase(c)}_podatki_enopolna.txt`, besediloEnopolna(c), 'text/plain;charset=utf-8'); break;
     case 'enoJson': download(`${fileBase(c)}_podatki_enopolna.json`, JSON.stringify(podatkiEnopolna(c), null, 2), 'application/json'); break;
-    case 'pvDl': if (PV) download(PV.name, new Blob([PV.bytes], { type: 'application/pdf' })); break;
+    case 'pvDl': if (PV) { if (PV.zip) download(PV.zip, zipBlob(PV.files.map(x => ({ name: x.name, data: x.bytes })))); else download(PV.files[0].name, new Blob([PV.files[0].bytes], { type: 'application/pdf' })); } break;
     case 'pvClose': closePreview(); break;
     case 'katAdd': S.katalog[b.dataset.k].push(b.dataset.k === 'razsmerniki' ? { proizvajalec: '', model: '', kva: '', faze: '3f' } : { proizvajalec: '', model: '', tehnologija: 'LFP', kwh: '', kwP: '', kwO: '', faze: '3f' }); saveSettings(); renderSettings(); break;
     case 'katDel': S.katalog[b.dataset.k].splice(+b.dataset.i, 1); saveSettings(); renderSettings(); break;
@@ -1058,7 +1126,8 @@ function podatkiEnopolna(c) {
   const d = {
     orodje: 'vloga-za-soglasje', namen: 'podatki za enopolno shemo', izvoz: today(),
     uporabnik: { naziv: uporabnik(c) || null, naslov: naslov(c.im) || null, tel: c.im.tel || null, email: c.im.email || null },
-    lokacija: { naslov: lokacija(c) || null, katastrskaObcina: c.mm.ko || null, parcele: c.mm.parcele || null },
+    lokacija: { naslov: lokacija(c) || null, katastrskaObcina: koTxt(c) || null, parcele: parceleTxt(c) || null,
+      seznamParcel: parc(c).map(x => ({ ko: x.ko || null, parcela: x.st || null, lastniki: osebe(c).filter(o => x.lastniki && x.lastniki[o.id]).map(osebaIme) })) },
     merilnoMesto: {
       obstojece: !!c.mm.obstojece, stevilka: /^4-\d+$/.test(mmSt) ? mmSt : null, gsrn: c.mm.gsrn.replace(/\s/g, '') || null,
       prikljucnaMocOdjemaKw: n(c.mm.pmOdjem)
@@ -1090,7 +1159,7 @@ function besediloEnopolna(c) {
   const L = [`PODATKI ZA ENOPOLNO SHEMO – ${v(d.uporabnik.naziv)}`, `Izvoz: ${fmtD(d.izvoz)}${d.manjka.length ? ' (vloga še ni izpolnjena do konca)' : ''}`, '',
     `Uporabnik: ${v(join([d.uporabnik.naziv, d.uporabnik.naslov]))}`,
     `Lokacija: ${v(d.lokacija.naslov)}`,
-    `K.o. / parcela: ${v(join([d.lokacija.katastrskaObcina, d.lokacija.parcele && 'parc. št. ' + d.lokacija.parcele]))}`,
+    `K.o. / parcele: ${v(parceleOpis(c))}`,
     `Merilno mesto: ${d.merilnoMesto.obstojece ? v(join([d.merilnoMesto.stevilka, d.merilnoMesto.gsrn && 'GSRN ' + d.merilnoMesto.gsrn])) : 'novo merilno mesto'}`,
     `Priključna moč odjema: ${v(d.merilnoMesto.prikljucnaMocOdjemaKw, ' kW')}`];
   if (e) {
@@ -1128,18 +1197,23 @@ function izvoziPriklop(c) {
   toast(c.oddaja.szp ? 'Izvoženo – uvozite v Vloga-priklop (Vloge → Uvozi).' : 'Izvoženo brez številke soglasja – dopolnite jo v Vloga-priklop.');
 }
 
-/* ---------- PDF: pooblastilo in tehnična dokumentacija ---------- */
+/* ---------- PDF: pooblastila in tehnična dokumentacija (slog dokumentov ENSET) ---------- */
 const b64 = str => Uint8Array.from(atob(str), ch => ch.charCodeAt(0));
-const pdfReady = () => !!(window.PDFLib && window.fontkit && window.VS_PISAVA);
-let FONT_BYTES;
+const pdfReady = () => !!(window.PDFLib && window.fontkit && window.VS_PISAVA && window.VS_PISAVA_B);
+let FONT_BYTES, FONTB_BYTES, LOGO_BYTES;
 const TEHDOC = {}; // caseId -> { name, bytes, size } – zadnja pripravljena tehnična dokumentacija
-const A4 = [595.28, 841.89], ML = 62, MR = 62, INK = () => PDFLib.rgb(0.1, 0.1, 0.12), GRAY = () => PDFLib.rgb(0.42, 0.45, 0.5);
+const A4 = [595.28, 841.89], M = 42.5, W0 = A4[0] - 2 * M; // rob 15 mm kot v konfiguratorju ENSET
+// Barve ENSET (petrolej + jantar iz logotipa), enake kot v ENSET-Konfiguratorji.
+const hex = h => PDFLib.rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
+const BARVE = { dark: '#1B6F73', accent: '#288C91', pale: '#EAF7F8', tint: '#F5FBFB', lineSoft: '#CFE4E6', rowLine: '#E6EFF0', amberInk: '#D9820F', ink: '#1F2933', grey: '#6E7E8E', body: '#4E5B63' };
+const C = k => hex(BARVE[k]);
 
 async function novDoc() {
   const doc = await PDFLib.PDFDocument.create();
   doc.registerFontkit(window.fontkit);
-  FONT_BYTES ||= b64(window.VS_PISAVA);
-  return { doc, font: await doc.embedFont(FONT_BYTES, { subset: true }) };
+  FONT_BYTES ||= b64(window.VS_PISAVA); FONTB_BYTES ||= b64(window.VS_PISAVA_B);
+  const font = await doc.embedFont(FONT_BYTES, { subset: true }), bold = await doc.embedFont(FONTB_BYTES, { subset: true });
+  return { doc, font, bold };
 }
 function wrap(font, s, sz, w) {
   const out = [];
@@ -1153,87 +1227,184 @@ function wrap(font, s, sz, w) {
   }
   return out;
 }
-// Preprost pisec besedila po straneh A4.
-function pisec(doc, font) {
-  const W = { page: null, y: 0 };
-  const W0 = A4[0] - ML - MR;
-  W.nova = () => { W.page = doc.addPage(A4); W.y = A4[1] - 64; };
-  W.prostor = h => { if (!W.page || W.y - h < 60) W.nova(); };
-  W.txt = (s, o = {}) => {
-    const sz = o.sz || 10.5, lh = sz * 1.38, x = ML + (o.ind || 0), w = W0 - (o.ind || 0);
-    for (const line of wrap(font, s, sz, w)) {
-      W.prostor(lh);
-      const dx = o.center ? (w - font.widthOfTextAtSize(line, sz)) / 2 : 0;
-      W.page.drawText(line, { x: x + dx, y: W.y - sz, size: sz, font, color: o.gray ? GRAY() : INK() });
-      W.y -= lh;
-    }
-    W.y -= o.after ?? 4;
+// Pisec dokumenta v slogu ENSET: glava z logotipom, razdelki (jantarni nadnaslov + naslov + petrolejna črta),
+// okvirja strank, tabele s petrolejno glavo, podpisna polja in noga na vsaki strani.
+function pisec(doc, F) {
+  const { font, bold } = F, W = { page: null, y: 0 };
+  // Razprte velike črke (nadnaslovi, oznake polj).
+  const caps = (pg, t, x, y, sz, color, sp = 0.13) => {
+    let xx = x; for (const ch of String(t).toUpperCase()) { pg.drawText(ch, { x: xx, y, size: sz, font: bold, color }); xx += bold.widthOfTextAtSize(ch, sz) + sz * sp; }
+    return xx - x;
   };
-  W.naslov = (s, sz = 13) => { W.prostor(sz * 3); W.y -= 6; W.txt(s, { sz, after: 6 }); };
-  W.crta = (x0, x1) => { W.page.drawLine({ start: { x: x0, y: W.y }, end: { x: x1, y: W.y }, thickness: 0.6, color: GRAY() }); };
-  // Tabela: kv = [[oznaka, vrednost], ...]
-  W.kv = (rows, lw = 190) => {
-    for (const [k, v] of rows) {
-      if (!String(v ?? '').trim()) continue;
-      const lines = wrap(font, v, 10, W0 - lw), h = lines.length * 13.8 + 2;
-      W.prostor(h);
-      W.page.drawText(k, { x: ML, y: W.y - 10, size: 9.5, font, color: GRAY() });
-      lines.forEach((l, i) => W.page.drawText(l, { x: ML + lw, y: W.y - 10 - i * 13.8, size: 10, font, color: INK() }));
-      W.y -= h;
+  W.caps = caps;
+  W.nova = () => { W.page = doc.addPage(A4); W.y = A4[1] - M; };
+  W.prostor = h => { if (!W.page || W.y - h < M + 28) W.nova(); };
+  W.gap = h => { W.y -= h; };
+  W.rect = (x, yTop, w, h, o) => W.page.drawRectangle({ x, y: yTop - h, width: w, height: h, ...o });
+  W.hline = (x0, x1, y, color = C('lineSoft'), t = 0.75) => W.page.drawLine({ start: { x: x0, y }, end: { x: x1, y }, thickness: t, color });
+  // Glava: nadnaslov, naslov (krepko), logotip desno, petrolejna črta.
+  W.glava = async (nadnaslov, naslovVrst) => {
+    W.nova();
+    const top = W.y;
+    LOGO_BYTES ||= window.VS_LOGO ? b64(window.VS_LOGO) : null;
+    let logoH = 0;
+    if (LOGO_BYTES) {
+      const img = await doc.embedPng(LOGO_BYTES), lw = 119, lh = lw * img.height / img.width;
+      W.page.drawImage(img, { x: A4[0] - M - lw, y: top - lh - 1, width: lw, height: lh }); logoH = lh + 1;
+    }
+    caps(W.page, nadnaslov, M, top - 7, 6.8, C('amberInk'), 0.15);
+    let y = top - 12;
+    for (const t of naslovVrst) { y -= 21; W.page.drawText(t, { x: M, y, size: 19, font: bold, color: C('ink') }); }
+    W.y = Math.min(y - 8, top - logoH - 6);
+    W.hline(M, M + W0, W.y, C('accent'), 1.2);
+    W.y -= 4;
+  };
+  // Trak s podatki: [[oznaka, vrednost], ...], širine v deležih.
+  W.trak = (polja, sir) => {
+    const kh = 15, vh = 24, h = kh + vh; W.prostor(h + 14); W.y -= 11;
+    let x = M;
+    polja.forEach(([k, v], i) => {
+      const w = sir[i] * W0;
+      W.rect(x, W.y, w, kh, { color: C('pale') });
+      const kw = caps({ drawText() {} }, k, 0, 0, 6.2, C('grey'));
+      caps(W.page, k, x + (w - kw) / 2, W.y - 10, 6.2, C('grey'));
+      let vv = String(v || '—'), sz = 10.5; while (sz > 7 && bold.widthOfTextAtSize(vv, sz) > w - 12) sz -= 0.25;
+      W.page.drawText(vv, { x: x + (w - bold.widthOfTextAtSize(vv, sz)) / 2, y: W.y - kh - 15.5, size: sz, font: bold, color: C('dark') });
+      if (i) W.page.drawLine({ start: { x, y: W.y }, end: { x, y: W.y - h }, thickness: 0.75, color: C('lineSoft') });
+      x += w;
+    });
+    W.rect(M, W.y, W0, h, { borderColor: C('lineSoft'), borderWidth: 0.75 });
+    W.y -= h;
+  };
+  // Okvirja strank: [{ cap, who, vrstice: [] }, ...]
+  W.stranke = list => {
+    const w = W0 / list.length, pad = 10;
+    const h = Math.max(...list.map(s => 13 + 15 + s.vrstice.reduce((a, t) => a + wrap(font, t, 8.6, w - 2 * pad).length * 11.5, 0))) + 2 * pad - 4;
+    W.prostor(h + 14); W.y -= 12;
+    list.forEach((s, i) => {
+      const x = M + i * w; let y = W.y - pad - 6;
+      caps(W.page, s.cap, x + pad, y, 6.2, C('grey')); y -= 15;
+      for (const l of wrap(bold, s.who || '—', 10, w - 2 * pad)) { W.page.drawText(l, { x: x + pad, y, size: 10, font: bold, color: C('ink') }); y -= 13; }
+      for (const t of s.vrstice) for (const l of wrap(font, t, 8.6, w - 2 * pad)) { W.page.drawText(l, { x: x + pad, y, size: 8.6, font, color: C('body') }); y -= 11.5; }
+      if (i) W.page.drawLine({ start: { x, y: W.y }, end: { x, y: W.y - h }, thickness: 0.75, color: C('lineSoft') });
+    });
+    W.rect(M, W.y, W0, h, { borderColor: C('lineSoft'), borderWidth: 0.75 });
+    W.y -= h;
+  };
+  // Razdelek: jantarni nadnaslov, naslov, petrolejna črta.
+  W.razdelek = (nad, nasl) => {
+    W.prostor(60); W.y -= 13;
+    caps(W.page, nad, M, W.y - 7, 6.8, C('amberInk'), 0.15); W.y -= 10;
+    W.page.drawText(nasl, { x: M, y: W.y - 13, size: 13, font: bold, color: C('ink') }); W.y -= 19;
+    W.hline(M, M + W0, W.y, C('accent'), 1.1); W.y -= 8;
+  };
+  W.p = (t, o = {}) => {
+    const sz = o.sz || 9, lh = sz * 1.5, x = M + (o.ind || 0), f = o.bold ? bold : font;
+    for (const l of wrap(f, t, sz, W0 - (o.ind || 0))) { W.prostor(lh); W.page.drawText(l, { x, y: W.y - sz, size: sz, font: f, color: o.grey ? C('grey') : C('ink') }); W.y -= lh; }
+    W.y -= o.after ?? 5;
+  };
+  W.alineje = list => {
+    for (const t of list) {
+      const ls = wrap(font, t, 9, W0 - 14);
+      ls.forEach((l, i) => { W.prostor(13.5); if (!i) W.page.drawText('•', { x: M + 3, y: W.y - 9, size: 9, font, color: C('accent') }); W.page.drawText(l, { x: M + 14, y: W.y - 9, size: 9, font, color: C('ink') }); W.y -= 13.5; });
+      W.y -= 2;
     }
     W.y -= 4;
   };
+  // Tabela s petrolejno glavo; sir = deleži širine.
   W.tabela = (glava, vrste, sir) => {
-    const sz = 9, rh = 15, xs = []; let x = ML; for (const s of sir) { xs.push(x); x += s * W0; }
-    const vrsta = (cells, g) => {
-      W.prostor(rh + 2);
-      cells.forEach((t, i) => {
-        let s = String(t ?? ''); const mw = sir[i] * W0 - 6;
-        while (s.length > 1 && font.widthOfTextAtSize(s, sz) > mw) s = s.slice(0, -2) + '…';
-        W.page.drawText(s, { x: xs[i] + 2, y: W.y - sz - 2, size: sz, font, color: g ? GRAY() : INK() });
-      });
-      W.y -= rh; W.crta(ML, ML + W0); W.y -= 2;
-    };
-    vrsta(glava, true); vrste.forEach(r => vrsta(r)); W.y -= 6;
+    const xs = []; let x = M; for (const s of sir) { xs.push(x); x += s * W0; }
+    const hh = 18; W.prostor(hh + 20); W.y -= 4;
+    W.rect(M, W.y, W0, hh, { color: C('accent') });
+    glava.forEach((t, i) => caps(W.page, t, xs[i] + 6, W.y - 11.5, 6.2, hex('#FFFFFF'), 0.11));
+    W.y -= hh;
+    vrste.forEach((r, ri) => {
+      const cells = r.map((t, i) => wrap(font, t, 8.6, sir[i] * W0 - 12)), h = Math.max(...cells.map(cc => cc.length)) * 11.5 + 9;
+      W.prostor(h);
+      if (ri % 2) W.rect(M, W.y, W0, h, { color: C('tint') });
+      cells.forEach((cc, i) => cc.forEach((l, j) => W.page.drawText(l, { x: xs[i] + 6, y: W.y - 13 - j * 11.5, size: 8.6, font, color: C('ink') })));
+      W.y -= h; W.hline(M, M + W0, W.y, C('rowLine'));
+    });
+    W.y -= 6;
   };
-  W.W0 = W0;
+  W.kv = rows => W.tabela(['Podatek', 'Vrednost'], rows.filter(([, v]) => String(v ?? '').trim()), [0.34, 0.66]);
+  // Podpisna polja: [{ cap, ime, pod }]
+  W.podpisi = list => {
+    const w = W0 / list.length, h = 72; W.prostor(h + 16); W.y -= 14;
+    list.forEach((s, i) => {
+      const x = M + i * w, pad = 10;
+      caps(W.page, s.cap, x + pad, W.y - pad - 6, 6.2, C('grey'));
+      if (s.ime) W.page.drawText(s.ime, { x: x + pad, y: W.y - pad - 21, size: 9.5, font: bold, color: C('ink') });
+      W.page.drawLine({ start: { x: x + pad, y: W.y - h + 22 }, end: { x: x + w - pad, y: W.y - h + 22 }, thickness: 0.75, color: C('ink') });
+      W.page.drawText(s.pod, { x: x + pad, y: W.y - h + 10, size: 8, font, color: C('grey') });
+      if (i) W.page.drawLine({ start: { x, y: W.y }, end: { x, y: W.y - h }, thickness: 0.75, color: C('lineSoft') });
+    });
+    W.rect(M, W.y, W0, h, { borderColor: C('lineSoft'), borderWidth: 0.75 });
+    W.y -= h;
+  };
+  // Noga na vseh straneh (podatki ENSET + številka strani).
+  W.noge = (od = 0, do_ = doc.getPageCount()) => {
+    const iz = S.izvajalec, pages = doc.getPages().slice(od, do_), n = pages.length;
+    const v1 = join([iz.naziv, join([join([iz.ulica, iz.hs], ' '), iz.posta]), iz.davcna && 'ID za DDV: SI' + String(iz.davcna).replace(/\D/g, '')], ' · ');
+    const v2 = join([iz.tel, iz.email, iz.splet], ' · ');
+    pages.forEach((pg, i) => {
+      pg.drawLine({ start: { x: M, y: M + 18 }, end: { x: M + W0, y: M + 18 }, thickness: 0.75, color: C('lineSoft') });
+      [v1, v2].forEach((t, j) => { const sz = 7; pg.drawText(t, { x: M + (W0 - font.widthOfTextAtSize(t, sz)) / 2, y: M + 8 - j * 9, size: sz, font, color: C('grey') }); });
+      if (n > 1) { const t = `${i + 1} / ${n}`; pg.drawText(t, { x: M + W0 - font.widthOfTextAtSize(t, 7), y: M + 8, size: 7, font, color: C('grey') }); }
+    });
+  };
   return W;
 }
 
-async function genPooblastilo(c) {
-  const { doc, font } = await novDoc(), W = pisec(doc, font), iz = S.izvajalec, im = c.im, PO = im.tip === 'po';
-  const kaj = join([c.vrste.d && 'naprave za individualno samooskrbo (sončne elektrarne)', c.vrste.f && 'hranilnika električne energije'], ' in ');
-  const mmTxt = c.mm.obstojece && /^4-\d+$/.test(c.mm.st.replace(/\s/g, '')) ? `na merilnem mestu št. ${c.mm.st.replace(/\s/g, '')}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}, ` : '';
-  W.nova(); W.y -= 20;
-  W.txt('POOBLASTILO', { sz: 18, center: true, after: 22 });
-  W.txt('Pooblastitelj (uporabnik / investitor):', { sz: 9.5, gray: true, after: 2 });
-  W.txt(join([PO ? im.naziv : join([im.ime, im.priimek], ' '), naslov(im)]) || '________________________________________________', { after: 2 });
-  W.txt(`davčna številka: ${im.davcna || '______________'}`, { after: 16 });
-  W.txt('pooblašča', { center: true, after: 14 });
-  W.txt('Pooblaščenca:', { sz: 9.5, gray: true, after: 2 });
-  W.txt(join([iz.naziv, naslov(iz)]), { after: 2 });
-  W.txt(join([`davčna številka: ${iz.davcna}`, iz.maticna && `matična številka: ${iz.maticna}`]), { after: 16 });
-  W.txt(`da v imenu pooblastitelja pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj || 'naprave'} ${mmTxt}na lokaciji ${lokacija(c) || '________________________'}${c.mm.ko || c.mm.parcele ? ` (k.o. ${c.mm.ko || '____'}, parc. št. ${c.mm.parcele || '____'})` : ''}, ter v tem postopku:`, { after: 6 });
-  for (const t of ['posreduje podatke in priloge ter vlogo po potrebi dopolni,', 'prejema obvestila, pozive in dokumente, povezane z vlogo, vključno s soglasjem za priključitev,', 'daje izjave in potrjuje pogoje, ki so del oddaje vloge.'])
-    W.txt('–  ' + t, { ind: 14, after: 3 });
-  W.y -= 8;
-  W.txt('Pooblastitelj izjavlja, da je seznanjen s Politiko zasebnosti družb ELES, d.o.o. in Elektro Maribor, d.d. ter s klavzulami o varstvu osebnih podatkov na Enotni vlogi, da so podatki v vlogi točni in resnični ter da dovoljuje, da se njegovi osebni podatki zbirajo, hranijo, obdelujejo, uporabljajo in posredujejo za potrebe izvedbe vseh potrebnih postopkov.', { after: 8 });
-  W.txt('Pooblastilo velja do pravnomočnosti soglasja za priključitev oziroma do pisnega preklica.', { after: 30 });
-  const podpisi = [[PO ? 'Pooblastitelj (podpis in žig)' : 'Pooblastitelj (podpis)', PO ? im.naziv : join([im.ime, im.priimek], ' ')]];
-  if (im.solastniki) {
-    const imena = im.solastnikiImena.split(',').map(s => s.trim()).filter(Boolean);
-    (imena.length ? imena : ['', '']).forEach(n => podpisi.push(['Solastnik (soglaša s postavitvijo naprave in z vlogo)', n]));
+// Eno pooblastilo za eno osebo (uporabnik ali drug lastnik).
+async function genPooblastilo(c, oseba) {
+  const F = await novDoc(), { doc } = F, W = pisec(doc, F), iz = S.izvajalec, PO = oseba.tip === 'po';
+  const kaj = join([c.vrste.d && 'naprave za individualno samooskrbo (sončne elektrarne)', c.vrste.f && 'hranilnika električne energije'], ' in ') || 'naprave';
+  const mmSt = c.mm.obstojece && /^4-\d+$/.test(c.mm.st.replace(/\s/g, '')) ? c.mm.st.replace(/\s/g, '') : '';
+  const moje = parceleOd(c, oseba.id), vsiLastniki = x => osebe(c).filter(o => x.lastniki && x.lastniki[o.id]);
+  await W.glava('Pooblastilo', ['Pooblastilo za vlogo', 'za soglasje za priključitev']);
+  W.trak([['Zadeva', 'Enotna vloga za izdajo soglasja za priključitev'], ['Distributer', 'Elektro Maribor, d.d.'], ['Merilno mesto', c.mm.obstojece ? mmSt || '—' : 'novo']], [0.5, 0.25, 0.25]);
+  W.stranke([
+    { cap: oseba.jeUporabnik ? 'Pooblastitelj (uporabnik)' : 'Pooblastitelj (solastnik)', who: osebaIme(oseba), vrstice: [naslov(oseba) || 'naslov: ____________________', `Davčna številka: ${oseba.davcna || '______________'}`] },
+    { cap: 'Pooblaščenec', who: iz.naziv, vrstice: [naslov(iz), join([iz.davcna && 'ID za DDV: SI' + String(iz.davcna).replace(/\D/g, ''), iz.maticna && 'matična št.: ' + iz.maticna], ' · ')] }
+  ]);
+  W.razdelek('Predmet', 'Obseg pooblastila');
+  if (oseba.jeUporabnik) {
+    W.p(`Pooblastitelj pooblašča pooblaščenca, da v njegovem imenu pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj}${mmSt ? ` na merilnem mestu št. ${mmSt}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}` : ''} na lokaciji ${lokacija(c) || '__________________________'} ter v tem postopku:`);
+  } else {
+    W.p(`Pooblastitelj kot solastnik spodaj navedenih nepremičnin soglaša s postavitvijo in priključitvijo ${kaj}, ki jo na lokaciji ${lokacija(c) || '__________________________'} postavlja uporabnik ${join([uporabnik(c), naslov(c.im)]) || '__________________________'}, ter pooblašča pooblaščenca, da to soglasje predloži družbi Elektro Maribor, d.d. ob Enotni vlogi za izdajo soglasja za priključitev ter v tem postopku:`);
   }
-  W.prostor(60);
-  W.page.drawText('Kraj in datum: ________________________________', { x: ML, y: W.y - 10, size: 10.5, font, color: INK() });
-  W.y -= 46;
-  for (const [vloga, ime] of podpisi) {
-    W.prostor(56);
-    W.crta(A4[0] - MR - 230, A4[0] - MR); W.y -= 4;
-    W.page.drawText(vloga, { x: A4[0] - MR - 230, y: W.y - 9, size: 8.5, font, color: GRAY() });
-    if (ime) W.page.drawText(ime, { x: A4[0] - MR - 230, y: W.y - 21, size: 9.5, font, color: INK() });
-    W.y -= 50;
+  W.alineje(['posreduje podatke in priloge ter vlogo po potrebi dopolni,', 'prejema obvestila, pozive in dokumente, povezane z vlogo, vključno s soglasjem za priključitev,', 'daje izjave in potrjuje pogoje, ki so del oddaje vloge.']);
+  const napTxt = napravaTxt(c);
+  if (napTxt) W.p(`Naprava: ${napTxt}.`, { grey: true, sz: 8.6 });
+  if (moje.length) {
+    W.razdelek('Nepremičnine', 'Parcele v lasti pooblastitelja');
+    W.tabela(['Katastrska občina', 'Parcelna št.', 'Lastništvo'], moje.map(x => {
+      const drugi = vsiLastniki(x).filter(o => o.id !== oseba.id).map(osebaIme).filter(Boolean);
+      return [x.ko, x.st, drugi.length ? `solastnik (skupaj z: ${drugi.join(', ')})` : 'lastnik'];
+    }), [0.32, 0.2, 0.48]);
   }
+  W.razdelek('Izjava', 'Varstvo osebnih podatkov');
+  W.p('Pooblastitelj izjavlja, da je seznanjen s Politiko zasebnosti družb ELES, d.o.o. in Elektro Maribor, d.d. ter s klavzulami o varstvu osebnih podatkov na Enotni vlogi, da so navedeni podatki točni in resnični ter da dovoljuje, da se njegovi osebni podatki zbirajo, hranijo, obdelujejo, uporabljajo in posredujejo za potrebe izvedbe vseh potrebnih postopkov.');
+  W.p('Pooblastilo velja do pravnomočnosti soglasja za priključitev oziroma do pisnega preklica.');
+  W.podpisi([
+    { cap: 'Pooblastitelj', ime: osebaIme(oseba), pod: `Kraj, datum in podpis${PO ? ' (žig)' : ''}` },
+    { cap: 'Pooblaščenec', ime: iz.naziv, pod: 'Podpis in žig' }
+  ]);
+  W.noge();
+  return doc.save();
+}
+// Vsa pooblastila: [{ oseba, name, bytes }]
+async function genPooblastila(c) {
+  const out = [], pod = podpisniki(c);
+  for (const [i, o] of pod.entries()) {
+    out.push({ oseba: o, name: `${fileBase(c)}_pooblastilo${pod.length > 1 ? `_${i + 1}_${slug(o.priimek || osebaIme(o)) || 'lastnik'}` : ''}_za_podpis.pdf`, bytes: await genPooblastilo(c, o) });
+  }
+  return out;
+}
+async function zdruziPdf(list) {
+  const doc = await PDFLib.PDFDocument.create();
+  for (const b of list) { const src = await PDFLib.PDFDocument.load(b); (await doc.copyPages(src, src.getPageIndices())).forEach(p => doc.addPage(p)); }
   return doc.save();
 }
 
@@ -1256,47 +1427,43 @@ async function dodajDatoteko(doc, font, file, oznaka) {
   const j = await slikaJpeg(file), img = await doc.embedJpg(j.bytes);
   const land = j.w > j.h, size = land ? [A4[1], A4[0]] : A4, pg = doc.addPage(size);
   const mx = 30, top = 44, sc = Math.min((size[0] - 2 * mx) / j.w, (size[1] - top - mx) / j.h);
-  pg.drawText(oznaka, { x: mx, y: size[1] - 28, size: 9, font, color: GRAY() });
+  pg.drawText(oznaka, { x: mx, y: size[1] - 28, size: 9, font, color: C('grey') });
   pg.drawImage(img, { x: (size[0] - j.w * sc) / 2, y: size[1] - top - j.h * sc, width: j.w * sc, height: j.h * sc });
   return 1;
 }
 async function genTehDoc(c) {
-  const { doc, font } = await novDoc(), W = pisec(doc, font), m = moci(c), im = c.im, iz = S.izvajalec, f = fs(c);
-  const L = lok(c), el = c.el, hr = c.hr;
-  W.nova();
-  W.txt(c.vrste.d ? 'TEHNIČNA DOKUMENTACIJA ZA IZVEDBO NAPRAVE ZA SAMOOSKRBO' : 'IDEJNA ZASNOVA VKLJUČITVE HRANILNIKA ELEKTRIČNE ENERGIJE', { sz: 14, after: 2 });
-  if (c.vrste.d && c.vrste.f) W.txt('z idejno zasnovo vključitve hranilnika električne energije v interno električno inštalacijo', { sz: 10.5, gray: true, after: 2 });
-  W.txt(`Priloga k Enotni vlogi za izdajo soglasja za priključitev – ${DIST.ime}`, { sz: 9.5, gray: true, after: 14 });
+  const F = await novDoc(), { doc, font } = F, W = pisec(doc, F), m = moci(c), im = c.im, iz = S.izvajalec, f = fs(c);
+  const el = c.el, hr = c.hr;
+  await W.glava('Priloga k Enotni vlogi', c.vrste.d ? ['Tehnična dokumentacija', 'naprave za samooskrbo'] : ['Idejna zasnova vključitve', 'hranilnika električne energije']);
+  const mmSt = c.mm.obstojece ? (c.mm.st !== '4-' ? c.mm.st.replace(/\s/g, '') : '—') : 'novo';
+  W.trak([['Uporabnik', uporabnik(c)], ['Merilno mesto', mmSt], [c.vrste.d ? 'FN moduli' : 'Hranilnik', c.vrste.d ? (m.kwp ? `${fmtN(m.kwp, 2)} kWp` : '—') : (m.heeKwh ? `${fmtN(m.heeKwh)} kWh` : '—')]], [0.5, 0.25, 0.25]);
+  if (c.vrste.d && c.vrste.f) { W.gap(6); } if (c.vrste.d && c.vrste.f) W.p('Vključuje idejno zasnovo vključitve hranilnika električne energije v interno električno inštalacijo.', { grey: true, sz: 8.6, after: 0 });
 
-  W.naslov('1. Investitor in lokacija', 11.5);
+  W.razdelek('Lokacija', 'Investitor in lokacija');
   W.kv([
     ['Uporabnik (investitor)', join([uporabnik(c), naslov(im)])],
     ['Lokacija naprave', lokacija(c)],
-    ['Katastrska občina, parcela', join([c.mm.ko, c.mm.parcele && 'parc. št. ' + c.mm.parcele])],
+    ['Katastrska občina, parcele', parceleOpis(c)],
     ['Merilno mesto', c.mm.obstojece ? join([c.mm.st !== '4-' && c.mm.st, c.mm.gsrn && 'GSRN ' + c.mm.gsrn]) : 'novo merilno mesto'],
     ['Priključna moč odjema MM', c.mm.pmOdjem ? `${fmtN(num(c.mm.pmOdjem))} kW` : '']
   ]);
-
   if (c.vrste.d) {
-    W.naslov('2. Naprava za samooskrbo', 11.5);
+    W.razdelek('Proizvodna naprava', 'Naprava za samooskrbo');
     W.kv([
       ['Vrsta naprave', join([el.naziv || R().nazivNaprave, 'naprava za individualno samooskrbo'], ' – ')],
       ['Proizvodni vir', OPC.vir[el.vir]],
       ['Način vključevanja v DS', OPC.shema[el.shema]],
       ['Način obratovanja', obrTxt(el.obr)],
-      ['FN moduli', m.kwp ? `${el.panelKos} × ${el.panelModel || 'FN modul'} ${el.panelWp} Wp = ${fmtN(m.kwp, 3)} kWp` : ''],
+      ['FN moduli', m.kwp ? `${el.panelKos} × ${el.panelModel || 'FN modul'}, ${el.panelWp} Wp = ${fmtN(m.kwp, 3)} kWp` : ''],
       ['Instalirana moč razsmernikov', m.kva ? `${fmtN(m.kva)} kVA` : ''],
       ['Priključna moč oddaje', join([`obstoječa ${fmtN(num(el.pmObstojeca))} kW`, el.pmNova && `nova ${fmtN(num(el.pmNova))} kW`])],
       ['Predvidena letna proizvodnja', m.letno ? `${fmtN(m.letno, 0)} kWh (za lastne potrebe ${fmtN(m.lastne, 0)} kWh, za oddajo v omrežje ${fmtN(m.oddaja, 0)} kWh)` : '']
     ]);
-    if (m.rs.length) {
-      W.txt('Razsmerniki', { sz: 10, gray: true, after: 2 });
-      W.tabela(['Proizvajalec', 'Model', 'Enot', 'Moč enote', 'Napetost', 'Faze', 'Vrsta'],
-        m.rs.map(r => [r.proizvajalec, r.model, kos(r), `${fmtN(num(r.kva))} kVA`, `${napetost(r)} V`, r.faze, 'fotonapetostni']), [0.18, 0.28, 0.07, 0.13, 0.11, 0.08, 0.15]);
-    }
+    if (m.rs.length) W.tabela(['Proizvajalec', 'Model', 'Enot', 'Moč enote', 'Napetost', 'Faze', 'Vrsta'],
+      m.rs.map(r => [r.proizvajalec, r.model, kos(r), `${fmtN(num(r.kva))} kVA`, `${napetost(r)} V`, r.faze, 'fotonapetostni']), [0.17, 0.27, 0.08, 0.13, 0.11, 0.08, 0.16]);
   }
   if (c.vrste.f && m.hee.length) {
-    W.naslov(`${c.vrste.d ? 3 : 2}. Hranilnik električne energije`, 11.5);
+    W.razdelek('Shranjevanje energije', 'Hranilnik električne energije');
     W.kv([
       ['Skupna kapaciteta', `${fmtN(m.heeKwh)} kWh`],
       ['Največja moč polnjenja / praznjenja', `${fmtN(m.heeP)} kW / ${fmtN(m.heeO)} kW`],
@@ -1305,16 +1472,14 @@ async function genTehDoc(c) {
       ['Vključitev', 'v interno električno inštalacijo objekta za merilnim mestom']
     ]);
     W.tabela(['Proizvajalec', 'Model', 'Enot', 'Tehnol.', 'kWh', 'kW polnj.', 'kW prazn.', 'Faze'],
-      m.hee.map(h => [h.proizvajalec, h.model, kos(h), OPC.tehnologija[h.tehnologija] || h.tehnologija, fmtN(num(h.kwh)), fmtN(num(h.kwP)), fmtN(num(h.kwO || h.kwP)), h.faze]), [0.17, 0.25, 0.07, 0.1, 0.1, 0.11, 0.11, 0.09]);
+      m.hee.map(h => [h.proizvajalec, h.model, kos(h), OPC.tehnologija[h.tehnologija] || h.tehnologija, fmtN(num(h.kwh)), fmtN(num(h.kwP)), fmtN(num(h.kwO || h.kwP)), h.faze]), [0.16, 0.24, 0.07, 0.1, 0.1, 0.12, 0.12, 0.09]);
   }
   const enop = f.enopolna || [], listi = f.listi || [];
-  W.naslov(`${1 + (c.vrste.d ? 1 : 0) + (c.vrste.f && m.hee.length ? 1 : 0) + 1}. Priloge`, 11.5);
+  W.razdelek('Priloge', 'Seznam prilog');
   const sez = [...enop.map(x => 'Enopolna shema z vrisano točko priključitve v interno NN omrežje – ' + x.name), ...listi.map(x => 'Tehnični list – ' + x.name)];
-  if (sez.length) sez.forEach((t, i) => W.txt(`${i + 1}. ${t}`, { ind: 6, after: 2 }));
-  else W.txt('(enopolna shema in tehnični listi niso priloženi)', { gray: true });
-  W.y -= 18;
-  W.txt(`Pripravil: ${join([iz.naziv, naslov(iz)])}${iz.kontakt ? `, ${iz.kontakt}` : ''}`, { sz: 9.5, gray: true, after: 2 });
-  W.txt(`Datum: ${fmtD(today())}`, { sz: 9.5, gray: true });
+  if (sez.length) W.alineje(sez); else W.p('(enopolna shema in tehnični listi niso priloženi)', { grey: true });
+  W.p(`Pripravil: ${join([iz.naziv, iz.kontakt])} · ${fmtD(today())}`, { grey: true, sz: 8.6 });
+  W.noge(); // samo strani opisa; priložene strani ostanejo, kot so
   const napake = [];
   for (const x of enop) { try { await dodajDatoteko(doc, font, x, 'Enopolna shema'); } catch (err) { console.error(err); napake.push(x.name); } }
   for (const x of listi) { try { await dodajDatoteko(doc, font, x, 'Tehnični list'); } catch (err) { console.error(err); napake.push(x.name); } }
@@ -1332,15 +1497,50 @@ async function pripraviTeh(c) {
   } catch (err) { console.error(err); toast('Tehnične dokumentacije ni bilo mogoče pripraviti.'); return false; }
 }
 
-let PV = null; // { name, bytes, url }
+/* ---------- ZIP (brez stiskanja, kot v Vloga-priklop) ---------- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = ~0; for (let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 255] ^ (c >>> 8); return (~c) >>> 0; }
+function zipBlob(entries) {
+  const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let off = 0;
+  for (const e of entries) {
+    const nm = enc.encode(e.name), crc = crc32(e.data), sz = e.data.length;
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true);
+    h.setUint32(18, sz, true); h.setUint32(22, sz, true); h.setUint16(26, nm.length, true);
+    parts.push(h.buffer, nm, e.data);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+    cd.setUint16(12, time, true); cd.setUint16(14, date, true); cd.setUint32(16, crc, true);
+    cd.setUint32(20, sz, true); cd.setUint32(24, sz, true); cd.setUint16(28, nm.length, true); cd.setUint32(42, off, true);
+    central.push(cd.buffer, nm);
+    off += 30 + nm.length + sz;
+  }
+  const cdSize = central.reduce((a, b) => a + b.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, off, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+}
+
+let PV = null; // { files: [{ name, bytes }], zip, url }
 async function showPdf(c, kaj) {
   if (!pdfReady()) return toast('Knjižnice za PDF niso naložene.');
   try {
-    let name, bytes, title;
-    if (kaj === 'poob') { bytes = await genPooblastilo(c); name = `${fileBase(c)}_pooblastilo_za_podpis.pdf`; title = 'Pooblastilo za podpis'; }
-    else { if (!await pripraviTeh(c)) return; ({ name, bytes } = TEHDOC[c.id]); title = `Tehnična dokumentacija (${fmtMB(bytes.length)})`; renderEdit(); }
+    let files, title, prikaz;
+    if (kaj === 'poob') {
+      files = (await genPooblastila(c)).map(x => ({ name: x.name, bytes: x.bytes }));
+      prikaz = files.length > 1 ? await zdruziPdf(files.map(x => x.bytes)) : files[0].bytes;
+      title = files.length > 1 ? `Pooblastila za podpis (${files.length}: ${podpisniki(c).map(osebaIme).join(', ')}) – Prenesi shrani ZIP` : 'Pooblastilo za podpis';
+    } else {
+      if (!await pripraviTeh(c)) return;
+      files = [{ name: TEHDOC[c.id].name, bytes: TEHDOC[c.id].bytes }]; prikaz = files[0].bytes;
+      title = `Tehnična dokumentacija (${fmtMB(prikaz.length)})`; renderEdit();
+    }
     closePreview();
-    PV = { name, bytes, url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })) };
+    PV = { files, zip: files.length > 1 ? `${fileBase(c)}_pooblastila_za_podpis.zip` : '', url: URL.createObjectURL(new Blob([prikaz], { type: 'application/pdf' })) };
     $('#pvTitle').textContent = title;
     $('#pvFrame').src = PV.url; $('#pvOpen').href = PV.url;
     $('#pv').hidden = false;
