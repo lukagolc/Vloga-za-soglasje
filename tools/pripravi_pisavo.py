@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Vgradi pisavi (Liberation Sans navadna in krepka) in logotip ENSET v lib/viri.js.
+"""Vgradi pisave in logotipa ENSET v lib/viri.js.
+
+- Liberation Sans (navadna, krepka) in lib/logo_enset.png: tehnicna dokumentacija
+- Vloga Sans (Carlito, glej tools/pripravi_carlito.py) in lib/logo_enset_pooblastilo.png:
+  pooblastilo po vzorcu ENSET
 
 Brskalnik iz datoteke, odprte z diska (file://), ne more brati datotek ob strani,
 zato so pisavi in logotip za PDF (pooblastilo, tehnicna dokumentacija) vgrajeni kot base64.
 Pisava je potrebna za slovenske znake (c, s, z s stresico).
 
-Uporaba: python3 tools/pripravi_pisavo.py   (ko zamenjate pisavo ali logotip lib/logo_enset.png)
+Uporaba: python3 tools/pripravi_pisavo.py   (ko zamenjate pisavo ali logotip)
 """
 import base64
 import json
@@ -17,6 +21,10 @@ data = {
     'VS_PISAVA': b('lib/fonts/LiberationSans-Regular.ttf'),
     'VS_PISAVA_B': b('lib/fonts/LiberationSans-Bold.ttf'),
     'VS_LOGO': b('lib/logo_enset.png'),
+    'VS_VLOGA_R': b('lib/fonts/VlogaSans-Regular.ttf'),
+    'VS_VLOGA_B': b('lib/fonts/VlogaSans-Bold.ttf'),
+    'VS_VLOGA_I': b('lib/fonts/VlogaSans-Italic.ttf'),
+    'VS_LOGO_P': b('lib/logo_enset_pooblastilo.png'),
 }
 out = ROOT / 'lib' / 'viri.js'
 out.write_text('// Samodejno ustvarjeno s tools/pripravi_pisavo.py - ne urejajte rocno.\n'

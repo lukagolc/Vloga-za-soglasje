@@ -214,7 +214,8 @@ const DEFAULTS = {
     decimalka: ',',       // decimalno ločilo pri kopiranju števil
     dodatniPodatki: '',   // izbira v polju »Dodatni podatki potrebni za izdajo soglasja« (Pričetek), če je vedno ista
     vrstaNaprave: 'naprava za individualno samooskrbo',
-    nazivNaprave: 'Sončna elektrarna'
+    nazivNaprave: 'Sončna elektrarna',
+    strosekOdstopa: '300,00' // pooblastilo: stroški postopka ob odstopu od izvedbe pri ENSET (EUR z DDV)
   },
   katalog: { razsmerniki: [], hranilniki: [] },
   templates: {
@@ -592,7 +593,7 @@ function koraki(c) {
 
   out.push({ n: 'Opombe in potrditev', v: [
     { l: 'Opombe', v: opombe(c) },
-    { l: 'Strinjam se s pogoji, navedenimi v klavzulah', izb: 'obkljukajte', r: true, h: 'S pooblastilom je stranka potrdila, da je seznanjena s klavzulami.' }
+    { l: 'Strinjam se s pogoji, navedenimi v klavzulah', izb: 'obkljukajte', r: true, h: 'S pooblastilom je stranka pooblastila ENSET, da v njenem imenu podpisuje in oddaja dokumentacijo.' }
   ] });
   out.push({ n: 'Tiskaj', v: [{ info: 'Neobvezno: shranite PDF kopijo vloge. Enako kopijo dobite po oddaji tudi po e-pošti.' }] });
   out.push({ n: 'Zaključi', v: [
@@ -832,7 +833,7 @@ function renderEdit() {
     <section class="card"><h2>Priloge</h2>
       <div class="pril"><div><b>Pooblastilo investitorja</b> <span class="pill">podpiše stranka</span></div>
         <div class="row" style="gap:6px"><button class="sm pri" data-act="genPoob"${pdfReady() ? '' : ' disabled'}>${podpisniki(c).length > 1 ? `Pokaži pooblastila (${podpisniki(c).length})` : 'Pokaži pooblastilo za podpis'}</button><label class="btn sm">Podpisano<input type="file" multiple hidden data-act="file" data-k="pooblastilo"></label></div>
-        <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}${podpisniki(c).length > 1 ? `Vsak lastnik dobi svoje pooblastilo (${podpisniki(c).length}) – naložite vsa podpisana. ` : ''}Vsebuje tudi izjavo o seznanjenosti s klavzulami o varstvu osebnih podatkov.</div></div>
+        <div class="meta">${(f.pooblastilo || []).length ? '📎 ' + f.pooblastilo.map(x => `${esc(x.name)} <span class="${x.size > MAX_DAT ? 'bad' : ''}">(${fmtMB(x.size)})</span>`).join(', ') + ` <button class="sm" data-act="clrFiles" data-k="pooblastilo">počisti</button> · ` : '<span style="color:var(--warn)">podpisano še ni dodano</span> · '}${podpisniki(c).length > 1 ? `Vsak lastnik dobi svoje pooblastilo (${podpisniki(c).length}) – naložite vsa podpisana. ` : ''}Po vzorcu ENSET; stroški ob odstopu ${esc(R().strosekOdstopa || '300,00')} EUR z DDV (Nastavitve → Napredno).</div></div>
       ${pril('enopolna', '<button class="sm" data-act="enoCp" title="Podatki za izdelavo enopolne sheme – tudi če vloga še ni izpolnjena">Kopiraj podatke</button><button class="sm" data-act="enoTxt">Prenesi .txt</button><button class="sm" data-act="enoJson">Prenesi .json</button>')}
       ${pril('listi')}
       <div class="pril"><div><b>Tehnična dokumentacija (PDF)</b> <span class="pill">pripravi orodje</span></div>
@@ -985,6 +986,7 @@ function renderSettings() {
       ${f('rules.nazivNaprave', 'Privzeti naziv naprave')}
       ${f('rules.vrstaNaprave', 'Izbira »Vrsta proizvodne naprave«')}
       ${f('rules.dodatniPodatki', 'Izbira »Dodatni podatki potrebni za izdajo soglasja«', { ph: 'prepišite z obrazca' })}
+      ${f('rules.strosekOdstopa', 'Pooblastilo: stroški ob odstopu (EUR z DDV)', { ph: '300,00' })}
     </div>
     <p class="small muted" style="margin:8px 0 0">Izbire vpišite z enakim besedilom kot na spletnem obrazcu – pomočnik jih prikaže pri ustreznem polju.</p>
   </section>
@@ -1212,7 +1214,7 @@ function izvoziPriklop(c) {
 
 /* ---------- PDF: pooblastila in tehnična dokumentacija (slog dokumentov ENSET) ---------- */
 const b64 = str => Uint8Array.from(atob(str), ch => ch.charCodeAt(0));
-const pdfReady = () => !!(window.PDFLib && window.fontkit && window.VS_PISAVA && window.VS_PISAVA_B);
+const pdfReady = () => !!(window.PDFLib && window.fontkit && window.VS_PISAVA && window.VS_PISAVA_B && window.VS_VLOGA_R);
 let FONT_BYTES, FONTB_BYTES, LOGO_BYTES;
 const TEHDOC = {}; // caseId -> { name, bytes, size } – zadnja pripravljena tehnična dokumentacija
 const A4 = [595.28, 841.89], M = 42.5, W0 = A4[0] - 2 * M; // rob 15 mm kot v konfiguratorju ENSET
@@ -1369,42 +1371,63 @@ function pisec(doc, F) {
   return W;
 }
 
-// Eno pooblastilo za eno osebo (uporabnik ali drug lastnik).
+// Eno pooblastilo za eno osebo (uporabnik ali drug lastnik) – po vzorcu ENSET
+// (besedilo, pisava Carlito/Vloga Sans, robovi 102 pt, logotip na vrhu vsake strani).
 async function genPooblastilo(c, oseba) {
-  const F = await novDoc(), { doc } = F, W = pisec(doc, F), iz = S.izvajalec, PO = oseba.tip === 'po';
-  const kaj = join([c.vrste.d && 'naprave za individualno samooskrbo (sončne elektrarne)', c.vrste.f && 'hranilnika električne energije'], ' in ') || 'naprave';
+  const doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(window.fontkit);
+  const F = { r: await doc.embedFont(b64(window.VS_VLOGA_R), { subset: true }), b: await doc.embedFont(b64(window.VS_VLOGA_B), { subset: true }), i: await doc.embedFont(b64(window.VS_VLOGA_I), { subset: true }) };
+  const logo = await doc.embedPng(b64(window.VS_LOGO_P)), BLACK = PDFLib.rgb(0, 0, 0), iz = S.izvajalec;
+  const X = 102, SIR = A4[0] - 2 * X, VRH = 119, DNO = 760;
+  let pg, y; // y: zgornji rob naslednje vrstice, merjeno od vrha strani
+  const nova = () => { pg = doc.addPage(A4); pg.drawImage(logo, { x: 217.64, y: 752.03, width: 160, height: 37.86 }); y = VRH; };
+  const bl = sz => A4[1] - y - sz * 0.8; // osnovnica vrstice
+  // Odstavek (ne deli se med strani): t besedilo, f pisava, sz velikost, ld razmik vrstic, pred razmik pred njim.
+  const odst = (t, o = {}) => {
+    const f = F[o.f || 'r'], sz = o.sz || 11, ld = o.ld || 15.5, vrst = o.center ? [t] : wrap(f, t, sz, SIR);
+    if (!pg || y + (o.pred ?? 9.5) + vrst.length * ld > DNO) nova(); else y += o.pred ?? 9.5;
+    for (const l of vrst) { pg.drawText(l, { x: o.center ? X + (SIR - f.widthOfTextAtSize(l, sz)) / 2 : X, y: bl(sz), size: sz, font: f, color: BLACK }); y += ld; }
+  };
+  // Polje »Oznaka: vrednost« v krepki pisavi; prazna vrednost = črta za ročni vpis.
+  const polje = (oz, v, o = {}) => {
+    const sz = 11, f = F[o.f || 'b'];
+    if (String(v ?? '').trim()) return odst(`${oz} ${v}`, { f: o.f || 'b', pred: o.pred });
+    if (!pg || y + (o.pred ?? 9.5) + 15.5 > DNO) nova(); else y += o.pred ?? 9.5;
+    pg.drawText(oz, { x: X, y: bl(sz), size: sz, font: f, color: BLACK });
+    const x0 = X + f.widthOfTextAtSize(oz + ' ', sz), dol = o.crta || 185;
+    pg.drawLine({ start: { x: x0, y: bl(sz) - 1.5 }, end: { x: x0 + dol, y: bl(sz) - 1.5 }, thickness: 0.7, color: BLACK });
+    y += 15.5;
+  };
   const mmSt = c.mm.obstojece && /^4-\d+$/.test(c.mm.st.replace(/\s/g, '')) ? c.mm.st.replace(/\s/g, '') : '';
-  const moje = parceleOd(c, oseba.id), vsiLastniki = x => osebe(c).filter(o => x.lastniki && x.lastniki[o.id]);
-  await W.glava('Pooblastilo', ['Pooblastilo za vlogo', 'za soglasje za priključitev']);
-  W.trak([['Zadeva', 'Enotna vloga za izdajo soglasja za priključitev'], ['Distributer', 'Elektro Maribor, d.d.'], ['Merilno mesto', c.mm.obstojece ? mmSt || '—' : 'novo']], [0.5, 0.25, 0.25]);
-  W.stranke([
-    { cap: oseba.jeUporabnik ? 'Pooblastitelj (uporabnik)' : 'Pooblastitelj (solastnik)', who: osebaIme(oseba), vrstice: [naslov(oseba) || 'naslov: ____________________', `Davčna številka: ${oseba.davcna || '______________'}`] },
-    { cap: 'Pooblaščenec', who: iz.naziv, vrstice: [naslov(iz), join([iz.davcna && 'ID za DDV: SI' + String(iz.davcna).replace(/\D/g, ''), iz.maticna && 'matična št.: ' + iz.maticna], ' · ')] }
-  ]);
-  W.razdelek('Predmet', 'Obseg pooblastila');
-  if (oseba.jeUporabnik) {
-    W.p(`Pooblastitelj pooblašča pooblaščenca, da v njegovem imenu pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj}${samoHee(c) && c.hr.predhodnoSzp ? ` (dograditev k soglasju št. ${c.hr.predhodnoSzp})` : ''}${mmSt ? ` na merilnem mestu št. ${mmSt}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}` : ''} na lokaciji ${lokacija(c) || '__________________________'} ter v tem postopku:`);
-  } else {
-    W.p(`Pooblastitelj kot solastnik spodaj navedenih nepremičnin soglaša s postavitvijo in priključitvijo ${kaj}, ki jo na lokaciji ${lokacija(c) || '__________________________'} postavlja uporabnik ${join([uporabnik(c), naslov(c.im)]) || '__________________________'}, ter pooblašča pooblaščenca, da to soglasje predloži družbi Elektro Maribor, d.d. ob Enotni vlogi za izdajo soglasja za priključitev ter v tem postopku:`);
-  }
-  W.alineje(['posreduje podatke in priloge ter vlogo po potrebi dopolni,', 'prejema obvestila, pozive in dokumente, povezane z vlogo, vključno s soglasjem za priključitev,', 'daje izjave in potrjuje pogoje, ki so del oddaje vloge.']);
-  const napTxt = napravaTxt(c);
-  if (napTxt) W.p(`Naprava: ${napTxt}.`, { grey: true, sz: 8.6 });
-  if (moje.length) {
-    W.razdelek('Nepremičnine', 'Parcele v lasti pooblastitelja');
-    W.tabela(['Katastrska občina', 'Parcelna št.', 'Lastništvo'], moje.map(x => {
-      const drugi = vsiLastniki(x).filter(o => o.id !== oseba.id).map(osebaIme).filter(Boolean);
-      return [x.ko, x.st, drugi.length ? `solastnik (skupaj z: ${drugi.join(', ')})` : 'lastnik'];
-    }), [0.32, 0.2, 0.48]);
-  }
-  W.razdelek('Izjava', 'Varstvo osebnih podatkov');
-  W.p('Pooblastitelj izjavlja, da je seznanjen s Politiko zasebnosti družb ELES, d.o.o. in Elektro Maribor, d.d. ter s klavzulami o varstvu osebnih podatkov na Enotni vlogi, da so navedeni podatki točni in resnični ter da dovoljuje, da se njegovi osebni podatki zbirajo, hranijo, obdelujejo, uporabljajo in posredujejo za potrebe izvedbe vseh potrebnih postopkov.');
-  W.p('Pooblastilo velja do pravnomočnosti soglasja za priključitev oziroma do pisnega preklica.');
-  W.podpisi([
-    { cap: 'Pooblastitelj', ime: osebaIme(oseba), pod: `Kraj, datum in podpis${PO ? ' (žig)' : ''}` },
-    { cap: 'Pooblaščenec', ime: iz.naziv, pod: 'Podpis in žig' }
-  ]);
-  W.noge();
+  const moje = parceleOd(c, oseba.id).length ? parceleOd(c, oseba.id) : parc(c);
+  const poKO = [...new Set(moje.map(x => String(x.ko).trim()))].map(ko => [ko, moje.filter(x => String(x.ko).trim() === ko).map(x => String(x.st).trim()).filter(Boolean).join(', ')]);
+
+  nova();
+  odst('POOBLASTILO', { f: 'b', sz: 14, ld: 18, center: true, pred: 0 });
+  odst('v zvezi z izgradnjo sončne elektrarne in/ali baterijskega hranilnika električne energije', { f: 'b', center: true, pred: 15.3 });
+  polje('Ime in priimek pooblastitelja:', osebaIme(oseba), { pred: 21.9 });
+  polje('Naslov:', naslov(oseba));
+  polje('Davčna št.:', String(oseba.davcna || '').replace(/\D/g, ''));
+  odst('Pooblastitelj mora biti lastnik oziroma solastnik nepremičnine, na kateri je predvidena postavitev sončne elektrarne in/ali baterijskega hranilnika električne energije. Če je lastnikov oziroma solastnikov več, se izpolni pooblastilo za vsakega lastnika oziroma solastnika posebej.', { f: 'i', sz: 10, ld: 14, pred: 8.8 });
+  odst('Spodaj podpisani pooblastitelj pooblaščam družbo:', { f: 'b', pred: 22.3 });
+  odst(iz.naziv, { pred: 8.9 });
+  odst(join([iz.ulica, iz.hs], ' '), { pred: 8.9 });
+  odst(iz.posta, { pred: 8.9 });
+  odst('da me kot izvajalec oziroma pooblaščenec za izvedbo postopkov v zvezi z izgradnjo sončne elektrarne (SE) in/ali baterijskega hranilnika električne energije (BHEE) zastopa za objekt oziroma nepremičnino:', { pred: 18.1 });
+  (poKO.length ? poKO : [['', '']]).forEach(([ko, st], i) => {
+    polje('Parcelna številka:', st, { pred: i ? 9.5 : 9.9 });
+    polje('Katastrska občina:', ko);
+  });
+  polje('Naslov objekta:', lokacija(c));
+  polje('Številka merilnega mesta / MM:', mmSt, { crta: 182 });
+  odst('da v mojem imenu pripravlja, izpolnjuje, podpisuje in oddaja vloge, zahtevke ter drugo potrebno dokumentacijo, ter pri pristojnem izvajalcu nalog distribucijskega operaterja, pristojni občini in drugih javnih ali zasebnih institucijah pridobi oziroma uredi vsa potrebna soglasja, dovoljenja, mnenja in druge dokumente, potrebne za načrtovanje, izvedbo in priključitev sončne elektrarne (SE) in/ali baterijskega hranilnika električne energije (BHEE).', { pred: 13.9 });
+  odst('Pooblaščenec je upravičen v mojem imenu podpisovati in oddajati dokumentacijo v fizični ali elektronski obliki, kadar je to potrebno za izvedbo postopkov iz tega pooblastila.', { pred: 10 });
+  odst(`V primeru uspešno pridobljenega soglasja za SE in/ali BHEE ter odstopa od izvedbe projekta pri družbi ENSET d.o.o. se pooblastitelj zavezuje plačati stroške postopka v višini ${R().strosekOdstopa || '300,00'} EUR z DDV. Ob izvedbi projekta pri družbi ENSET d.o.o. se stroški ne obračunajo.`, { pred: 10 });
+  odst('To pooblastilo velja od dneva podpisa do zaključka vseh postopkov, povezanih z izgradnjo in priključitvijo SE in/ali BHEE na navedenem objektu.', { pred: 10 });
+  // podpis: skupaj na isti strani
+  if (y + 30 + 15.5 + 25.9 + 15.5 + 8.1 + 15.5 > DNO) { nova(); y -= 30; }
+  polje('Kraj in datum:', '', { f: 'r', crta: 228, pred: 30 });
+  polje('Podpis pooblastitelja:', '', { f: 'r', crta: 232, pred: 25.9 });
+  odst(osebaIme(oseba), { pred: 8.1 });
   return doc.save();
 }
 // Vsa pooblastila: [{ oseba, name, bytes }]
