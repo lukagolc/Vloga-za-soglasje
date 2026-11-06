@@ -207,8 +207,8 @@ const MAX_DAT = 4 * MB; // največja velikost ene priloge na spletnem obrazcu
 // Možnosti so prepisane z uradne Enotne vloge EM (10/26). Če je besedilo na spletu drugačno, ga popravite tukaj.
 const OPC = {
   shema: { 'PS.3A': 'PS.3A naprava za individualno samooskrbo', 'PS.3B': 'PS.3B naprava za skupnostno samooskrbo', 'PS.1B': 'PS.1B', 'PS.1C': 'PS.1C', 'PS.2': 'PS.2' },
-  obratovanje: { paralelno: 'Paralelno z DS', otocno: 'Otočno' },
-  nacin: { M: 'M – mešani (za svoje potrebe in oddajo)', P: 'P – porabniški (samo za svoje potrebe)' },
+  // Način obratovanja: na spletnem obrazcu so to 4 potrditvena polja, obkljuka se poljubne.
+  obratovanje: { paralelno: 'Paralelno z DS', otocno: 'Otočno', P: 'P – porabniški (samo za svoje potrebe)', M: 'M – mešani (za svoje potrebe in oddajo)' },
   vir: { sonce: 'OVE – sonce', veter: 'OVE – veter', voda: 'OVE – voda' },
   tehnologija: { LFP: 'LFP', NMC: 'NMC', NCA: 'NCA', LTO: 'LTO', drugo: 'Drugo' },
   faze: { '3f': '3f', '1f': '1f' }
@@ -312,9 +312,9 @@ function newCase() {
     im: { tip: 'fo', ime: '', priimek: '', naziv: '', ulica: '', hs: '', kraj: '', posta: '', davcna: '', zavezanec: false, solastniki: false, solastnikiImena: '', tel: '', email: '' },
     plTretja: false,
     mm: { obstojece: true, st: '4-', gsrn: '', pmOdjem: '', enako: true, ulica: '', hs: '', kraj: '', posta: '', ko: '', parcele: '', vecKo: false, leto: String(new Date().getFullYear()), predhodna: '' },
-    el: { naziv: '', vir: 'sonce', panelModel: '', panelKos: '', panelWp: '', pmObstojeca: '0', pmNova: '', shema: 'PS.3A', obratovanje: 'paralelno', nacin: 'M', sistemske: false, letno: '', lastne: '' },
+    el: { naziv: '', vir: 'sonce', panelModel: '', panelKos: '', panelWp: '', pmObstojeca: '0', pmNova: '', shema: 'PS.3A', obr: { M: true }, sistemske: false, letno: '', lastne: '' },
     rs: [newRs()],
-    hr: { shema: 'PS.3A', obratovanje: 'paralelno', nacin: 'M', sistemske: false, predhodnoSzp: '' },
+    hr: { shema: 'PS.3A', obr: { M: true }, sistemske: false, predhodnoSzp: '' },
     hee: [],
     opombe: '', opombeRocno: false,
     oddaja: { st: '', datum: '', szp: '', szpDatum: '', szpPm: '' },
@@ -322,7 +322,13 @@ function newCase() {
   };
 }
 const cur = () => CASES.find(c => c.id === state.id);
-CASES = CASES.map(c => merge(newCase(), c));
+CASES = CASES.map(c => {
+  const n = merge(newCase(), c);
+  for (const x of [n.el, n.hr]) { delete x.obratovanje; delete x.nacin; } // stari zapis (dve ločeni izbiri)
+  return n;
+});
+const obrTxt = o => join(Object.keys(OPC.obratovanje).filter(k => o && o[k]).map(k => OPC.obratovanje[k]), ' · ');
+const obrCb = p => `<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)">Način obratovanja (obkljukajte kot na obrazcu)<div class="row" style="gap:6px 18px;color:var(--fg)">${Object.entries(OPC.obratovanje).map(([k, t]) => cb(`${p}.${k}`, t)).join('')}</div></div>`;
 
 /* ---------- izračuni ---------- */
 const R = () => S.rules;
@@ -397,6 +403,7 @@ function checks(c) {
     if (num(mm.pmOdjem) && m.kva > num(mm.pmOdjem)) e(`Moč razsmernikov (${fmtN(m.kva)} kVA) presega priključno moč odjema (${fmtN(num(mm.pmOdjem))} kW) – naprava za samooskrbo je ne sme.`);
     if (num(mm.pmOdjem) && num(c.el.pmNova) > num(mm.pmOdjem)) e(`Nova priključna moč (${cn(c.el.pmNova)} kW) presega priključno moč odjema (${fmtN(num(mm.pmOdjem))} kW).`);
     if (m.kva && num(c.el.pmNova) > m.kva + 0.01) w('Nova priključna moč je večja od moči razsmernikov – preverite.');
+    if (!obrTxt(c.el.obr)) e('Elektrarna: obkljukajte način obratovanja.');
     if (!m.letno) w('Vpišite predvideno letno proizvodnjo (gumb ≈ jo oceni).');
     else if (!num(c.el.lastne)) w('Vpišite predvideno letno proizvodnjo za lastne potrebe.');
     if (m.kwp && m.kva && m.kwp / m.kva > 1.5) w(`Razmerje FN moduli / razsmernik je ${fmtN(m.kwp / m.kva, 2)} – preverite podatke.`);
@@ -409,6 +416,7 @@ function checks(c) {
     });
     if (new Set(m.hee.map(h => h.tehnologija)).size > 1) w('Hranilniki imajo različne tehnologije – na obrazcu je ena izbira.');
     if (new Set(m.hee.map(h => h.faze)).size > 1) w('Hranilniki imajo različno število faz – na obrazcu je ena izbira.');
+    if (!obrTxt(c.hr.obr)) e('Hranilnik: obkljukajte način obratovanja.');
     if (!num(mm.pmOdjem)) e('Hranilnik: obrazec zahteva priključno moč (kW) – vpišite priključno moč odjema merilnega mesta.');
   }
   if (!(f.pooblastilo || []).length) w('Podpisano pooblastilo še ni dodano (obvezna priloga).');
@@ -504,7 +512,7 @@ function koraki(c) {
       { l: 'Celotna instalirana moč proizvodne naprave (kVA)', v: cz(m.kva), r: true },
       { sub: 'Tehnični podatki' },
       { l: 'Način vključevanja v DS tipska shema', izb: OPC.shema[el.shema], r: true },
-      { l: 'Način obratovanja', izb: join([OPC.obratovanje[el.obratovanje], OPC.nacin[el.nacin]], ' · '), r: true, h: 'Če seznam dovoli samo eno izbiro, izberite »Paralelno z DS«.' },
+      { l: 'Način obratovanja', izb: obrTxt(el.obr), pre: 'Obkljukajte', r: true, h: 'Potrditvena polja – obkljukajte samo navedeno.' },
       { l: 'Na voljo za sistemske storitve', izb: el.sistemske ? 'Da' : 'Ne' },
       ...m.rs.flatMap((r, i) => [
         { sub: `Razsmernik ${m.rs.length > 1 ? i + 1 + ' ' : ''}– gumb »Dodaj« (${join([r.proizvajalec, r.model], ' ')})` },
@@ -542,7 +550,7 @@ function koraki(c) {
       { l: 'Število faz', izb: OPC.faze[h0.faze] || h0.faze, r: true },
       { l: 'Priključna moč (kW)', v: cz(mm.pmOdjem), r: true, h: 'Priključna moč odjema merilnega mesta.' },
       { l: 'Način vključevanja v DS priključna shema', izb: OPC.shema[hr.shema], r: true },
-      { l: 'Način obratovanja', izb: join([OPC.obratovanje[hr.obratovanje], OPC.nacin[hr.nacin]], ' · '), r: true },
+      { l: 'Način obratovanja', izb: obrTxt(hr.obr), pre: 'Obkljukajte', r: true, h: 'Potrditvena polja – obkljukajte samo navedeno.' },
       { l: 'Na voljo za sistemske storitve', izb: hr.sistemske ? 'Da' : 'Ne', h: 'Če se pojavi.' },
       { sub: 'Katastrska občina in parcelna številka' },
       ...(c.vrste.d ? [{ l: 'Podatki o lokaciji so enaki podatkom na vlogi za soglasje', izb: 'kliknite (Kopiraj/Prenesi)' }]
@@ -736,8 +744,7 @@ function renderEdit() {
       ${inp('el.pmObstojeca', 'Obstoječa priključna moč oddaje (kW)', { type: 'number' })}
       ${numBtn('el.pmNova', 'Nova priključna moč (kW)', 'oceniPm')}
       ${sel('el.shema', 'Tipska shema', OPC.shema)}
-      ${sel('el.obratovanje', 'Obratovanje', OPC.obratovanje)}
-      ${sel('el.nacin', 'Način', OPC.nacin)}
+      ${obrCb('el.obr')}
     </div>
     <div style="margin-top:8px">${cb('el.sistemske', 'Na voljo za sistemske storitve')}</div>
     <h3>Predvidena letna proizvodnja</h3>
@@ -766,9 +773,8 @@ function renderEdit() {
     <button class="sm" style="margin-top:6px" data-act="addHee">+ Hranilnik</button>
     <div class="grid" style="margin-top:12px">
       ${sel('hr.shema', 'Priključna shema', OPC.shema)}
-      ${sel('hr.obratovanje', 'Obratovanje', OPC.obratovanje)}
-      ${sel('hr.nacin', 'Način', OPC.nacin)}
       ${inp('hr.predhodnoSzp', 'Št. že izdanega soglasja', { ph: 'samo, če se hranilnik dodaja' })}
+      ${obrCb('hr.obr')}
     </div>
     <div style="margin-top:8px">${cb('hr.sistemske', 'Na voljo za sistemske storitve')}</div>
     <p class="small muted" style="margin:8px 0 0">Na spletnem obrazcu je en hranilnik: kapaciteta in moči se seštejejo, tehnologija in faze se vzamejo s prvega.</p>
@@ -878,7 +884,7 @@ function vrstica(c, x) {
   } else if (x.dat) {
     val = x.dat.length ? 'naložite: <b>' + x.dat.map(esc).join(', ') + '</b>' : (x.r ? '— datoteka še ni dodana v orodje' : '<span class="muted">— (neobvezno)</span>');
   } else if ('izb' in x) {
-    val = x.izb ? `Izberite: <span class="izb">${esc(x.izb)}</span>` : (x.r ? '— izberite na obrazcu' : '—');
+    val = x.izb ? `${x.pre || 'Izberite'}: <span class="izb">${esc(x.izb)}</span>` : (x.r ? '— izberite na obrazcu' : '—');
   } else {
     val = String(x.v ?? '').trim() ? esc(x.v) : (x.r ? '— manjka' : '<span class="muted">—</span>');
     if (String(x.v ?? '').trim()) btn = `<button class="sm" data-act="cp" data-k="${esc(x.k)}">Kopiraj</button>`;
@@ -1241,7 +1247,7 @@ async function genTehDoc(c) {
       ['Vrsta naprave', join([el.naziv || R().nazivNaprave, 'naprava za individualno samooskrbo'], ' – ')],
       ['Proizvodni vir', OPC.vir[el.vir]],
       ['Način vključevanja v DS', OPC.shema[el.shema]],
-      ['Način obratovanja', join([OPC.obratovanje[el.obratovanje], OPC.nacin[el.nacin]])],
+      ['Način obratovanja', obrTxt(el.obr)],
       ['FN moduli', m.kwp ? `${el.panelKos} × ${el.panelModel || 'FN modul'} ${el.panelWp} Wp = ${fmtN(m.kwp, 3)} kWp` : ''],
       ['Instalirana moč razsmernikov', m.kva ? `${fmtN(m.kva)} kVA` : ''],
       ['Priključna moč oddaje', join([`obstoječa ${fmtN(num(el.pmObstojeca))} kW`, el.pmNova && `nova ${fmtN(num(el.pmNova))} kW`])],
@@ -1259,7 +1265,7 @@ async function genTehDoc(c) {
       ['Skupna kapaciteta', `${fmtN(m.heeKwh)} kWh`],
       ['Največja moč polnjenja / praznjenja', `${fmtN(m.heeP)} kW / ${fmtN(m.heeO)} kW`],
       ['Priključna shema', OPC.shema[hr.shema]],
-      ['Način obratovanja', join([OPC.obratovanje[hr.obratovanje], OPC.nacin[hr.nacin]])],
+      ['Način obratovanja', obrTxt(hr.obr)],
       ['Vključitev', 'v interno električno inštalacijo objekta za merilnim mestom']
     ]);
     W.tabela(['Proizvajalec', 'Model', 'Enot', 'Tehnol.', 'kWh', 'kW polnj.', 'kW prazn.', 'Faze'],

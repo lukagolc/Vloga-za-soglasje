@@ -62,7 +62,7 @@ Koraki (ob izbiri 4 + 6, pooblaščenec):
 - Obstoječa * (kW), Nova * (kW), Celotna instalirana moč proizvodne naprave * (kVA)
 ### Tehnični podatki
 - Način vključevanja v DS tipska shema * (izbira – možnosti ŠE NEZNANE; PDF: PS.1B/PS.1C/PS.2/PS.3A/PS.3B)
-- Način obratovanja * (ŠE NEZNANO; PDF: paralelno/otočno + P porabniški/M mešani)
+- Način obratovanja * – 4 potrditvena polja: Paralelno z DS / Otočno / P – porabniški / M – mešani (obkljuka se poljubne; običajno samo M)
 - Na voljo za sistemske storitve (spustni seznam)
 - Podatki o razsmernikih / generatorjih * – tabela z gumbom Dodaj:
   Generator/Razsmernik | Število enakih enot | Moč enote | Nazivna napetost | Vrsta generatorja/razsmernika | Število faz
@@ -85,7 +85,7 @@ Koraki (ob izbiri 4 + 6, pooblaščenec):
 - Največja delovna moč polnjenja * (kW), Največja delovna moč praznjenja * (kW)
 - Število faz * (spustni seznam), Priključna moč * (kW)
 - Način vključevanja v DS priključna shema * (spustni seznam)
-- Način obratovanja * (spustni seznam)
+- Način obratovanja * – 4 potrditvena polja kot pri elektrarni
 - (en spustni seznam med Način obratovanja in Katastrsko občino – verjetno "Na voljo za sistemske storitve", PREVERITI)
 ### Katastrska občina in parcelna številka
 - gumb: Podatki o lokaciji so enaki podatkom na vlogi za soglasje (Kopiraj/Prenesi) → kopira iz koraka 4
