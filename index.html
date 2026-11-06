@@ -220,11 +220,11 @@ const DEFAULTS = {
   templates: {
     pooblastilo: {
       ime: 'Stranki – pooblastilo za podpis',
-      zadeva: 'Sončna elektrarna – pooblastilo za vlogo za soglasje',
+      zadeva: '{{Predmet}} – pooblastilo za vlogo za soglasje',
       telo:
 `Pozdravljeni,
 
-za vašo sončno elektrarno bomo pri {{distributer}} oddali vlogo za izdajo soglasja za priključitev. Vlogo oddamo mi, v vašem imenu.
+za {{predmet}} bomo pri {{distributer}} oddali vlogo za izdajo soglasja za priključitev. Vlogo oddamo mi, v vašem imenu.
 
 V priponki je pooblastilo. Prosimo, da ga podpišete in nam vrnete (sken ali fotografija).{{blok_solastniki}}
 
@@ -272,6 +272,11 @@ function lsSet(k, v) {
 }
 let S = merge(DEFAULTS, lsGet(LS_SET));
 for (const k of ['tel', 'email', 'splet']) if (!S.izvajalec[k]) S.izvajalec[k] = DEFAULTS.izvajalec[k];
+// shranjene predloge iz prve verzije: »sončna elektrarna« -> glede na vrsto vloge
+if (S.templates.pooblastilo) {
+  S.templates.pooblastilo.telo = S.templates.pooblastilo.telo.replace('za vašo sončno elektrarno bomo', 'za {{predmet}} bomo');
+  if (S.templates.pooblastilo.zadeva === 'Sončna elektrarna – pooblastilo za vlogo za soglasje') S.templates.pooblastilo.zadeva = DEFAULTS.templates.pooblastilo.zadeva;
+}
 let CASES = lsGet(LS_CASES) || [];
 const FILES = {}; // caseId -> { kljucPriloge: [File] } – samo v tej seji
 let state = { view: 'list', id: null, tpl: null };
@@ -295,7 +300,7 @@ function newCase() {
     mm: { obstojece: true, st: '4-', gsrn: '', pmOdjem: '', enako: true, ulica: '', hs: '', kraj: '', posta: '', leto: String(new Date().getFullYear()), predhodna: '' },
     el: { naziv: '', vir: 'sonce', panelModel: '', panelKos: '', panelWp: '', pmObstojeca: '0', pmNova: '', shema: 'PS.3A', obr: { M: true }, sistemske: false, letno: '', lastne: '' },
     rs: [newRs()],
-    hr: { shema: 'PS.3A', obr: { M: true }, sistemske: false, predhodnoSzp: '' },
+    hr: { shema: 'PS.3A', obr: { M: true }, sistemske: false, predhodnoSzp: '', obstojeca: '' },
     hee: [],
     opombe: '', opombeRocno: false,
     oddaja: { st: '', datum: '', szp: '', szpDatum: '', szpPm: '' },
@@ -355,17 +360,21 @@ function moci(c) {
 const ocenaLetno = c => Math.round(moci(c).kwp * num(R().letniDonos));
 const ocenaLastne = c => Math.round(num(c.el.letno || ocenaLetno(c)) * num(R().delezLastne) / 100);
 function napravaTxt(c) {
-  const m = moci(c);
+  const m = moci(c), d = c.vrste.d;
   return join([
-    'sončna elektrarna' + (m.kwp ? ` ${fmtN(m.kwp)} kWp` : ''),
-    m.rs.length ? 'razsmernik ' + m.rs.map(r => `${kos(r) > 1 ? kos(r) + ' × ' : ''}${join([r.proizvajalec, r.model], ' ')}`).join(' + ') + (m.kva ? ` (${fmtN(m.kva)} kVA)` : '') : '',
+    d && 'sončna elektrarna' + (m.kwp ? ` ${fmtN(m.kwp)} kWp` : ''),
+    d && m.rs.length ? 'razsmernik ' + m.rs.map(r => `${kos(r) > 1 ? kos(r) + ' × ' : ''}${join([r.proizvajalec, r.model], ' ')}`).join(' + ') + (m.kva ? ` (${fmtN(m.kva)} kVA)` : '') : '',
     m.hee.length ? `hranilnik ${m.hee.map(h => `${kos(h) > 1 ? kos(h) + ' × ' : ''}${join([h.proizvajalec, h.model], ' ')}`).join(' + ')}${m.heeKwh ? ` (${fmtN(m.heeKwh)} kWh)` : ''}` : ''
   ]);
 }
+// Samo hranilnik (dograditev k obstoječi napravi).
+const samoHee = c => c.vrste.f && !c.vrste.d;
 function opombeAuto(c) {
-  const m = moci(c), iz = S.izvajalec;
+  const m = moci(c), iz = S.izvajalec, hr = c.hr;
   return join([
-    `Naprava za individualno samooskrbo (${c.el.shema}): ${napravaTxt(c)}.`,
+    samoHee(c)
+      ? `Dograditev hranilnika električne energije (${hr.shema}): ${napravaTxt(c) || 'hranilnik'}${join([hr.obstojeca && 'obstoječa naprava: ' + hr.obstojeca, hr.predhodnoSzp && 'soglasje št. ' + hr.predhodnoSzp]) ? ` – ${join([hr.obstojeca && 'obstoječa naprava: ' + hr.obstojeca, hr.predhodnoSzp && 'soglasje št. ' + hr.predhodnoSzp])}` : ''}.`
+      : `Naprava za individualno samooskrbo (${c.el.shema}): ${napravaTxt(c)}.`,
     `Vlogo oddaja pooblaščenec ${iz.naziv}${join([iz.kontakt, iz.tel, iz.email]) ? ` (${join([iz.kontakt, iz.tel, iz.email])})` : ''}.`
   ], ' ');
 }
@@ -612,6 +621,8 @@ function fill(tpl, c) {
   const vars = {
     uporabnik: uporabnik(c), naslov: naslov(c.im), lokacija: lokacija(c) || '—', mm: c.mm.st && c.mm.st !== '4-' ? c.mm.st : '—',
     naprava: napravaTxt(c) || '—', distributer: DIST.ime,
+    predmet: c.vrste.d ? (c.vrste.f ? 'vašo sončno elektrarno s hranilnikom' : 'vašo sončno elektrarno') : 'vaš hranilnik električne energije',
+    Predmet: c.vrste.d ? (c.vrste.f ? 'Sončna elektrarna s hranilnikom' : 'Sončna elektrarna') : 'Hranilnik električne energije',
     st_vloge: c.oddaja.st ? `, številka vloge ${c.oddaja.st}` : '',
     blok_solastniki: podpisniki(c).length > 1 ? `\nKer je lastnikov več, je v priponki za vsakega svoje pooblastilo – vsak naj podpiše svoje:\n${podpisniki(c).map(o => `  • ${osebaIme(o)}${parceleOd(c, o.id).length ? ` (parc. št. ${parceleOd(c, o.id).map(x => x.st).join(', ')})` : ''}`).join('\n')}` : '',
     blok_manjka: mk.length ? `Pošljite nam še:\n${mk.map(x => '  • ' + x).join('\n')}` : '',
@@ -701,7 +712,7 @@ function renderEdit() {
     <section class="card"><h2>1. Vloga</h2>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${cb('vrste.d', 'Soglasje za proizvodno napravo / napravo za individualno samooskrbo (sončna elektrarna)', true)}
-        ${cb('vrste.f', 'Soglasje za hranilnik električne energije', true)}
+        ${cb('vrste.f', 'Soglasje za hranilnik električne energije (tudi samo dograditev hranilnika k obstoječi elektrarni)', true)}
       </div>
       <div class="grid" style="margin-top:10px">${sel('status', 'Stanje', STATUS, true)}</div>
     </section>
@@ -810,7 +821,8 @@ function renderEdit() {
     <button class="sm" style="margin-top:6px" data-act="addHee">+ Hranilnik</button>
     <div class="grid" style="margin-top:12px">
       ${sel('hr.shema', 'Priključna shema', OPC.shema)}
-      ${inp('hr.predhodnoSzp', 'Št. že izdanega soglasja', { ph: 'samo, če se hranilnik dodaja' })}
+      ${inp('hr.predhodnoSzp', 'Št. že izdanega soglasja', { ph: 'pri dograditvi k obstoječi napravi' })}
+      ${samoHee(c) ? inp('hr.obstojeca', 'Obstoječa naprava (opis)', { ph: 'npr. SE 9,68 kWp, Huawei SUN2000-10KTL-M1', wide: true }) : ''}
       ${obrCb('hr.obr')}
     </div>
     <div style="margin-top:8px">${cb('hr.sistemske', 'Na voljo za sistemske storitve')}</div>
@@ -833,7 +845,7 @@ function renderEdit() {
 
     <section class="card"><h2>Opombe v vlogi</h2>
       <div style="margin-bottom:6px">${cb('opombeRocno', 'Opombe napišem sam', true)}</div>
-      ${c.opombeRocno ? `<textarea data-p="opombe" rows="3">${esc(c.opombe)}</textarea>` : `<p class="small" style="margin:0">${esc(opombeAuto(c))}</p>`}
+      ${c.opombeRocno ? `<textarea data-p="opombe" rows="3">${esc(c.opombe)}</textarea>` : `<p class="small" id="opombeAuto" style="margin:0">${esc(opombeAuto(c))}</p>`}
     </section>
 
     <section class="card"><h2>E-pošta stranki</h2>
@@ -872,9 +884,10 @@ function updateDerived() {
   osebe(c).forEach((o, j) => document.querySelectorAll(`[data-ime="${o.id}"]`).forEach(el => { el.textContent = osebaIme(o) || (j ? 'lastnik ' + (j + 1) : 'uporabnik'); }));
   if ($('#podpisnikiTxt')) $('#podpisnikiTxt').textContent = podpisniki(c).map(o => osebaIme(o) || '(brez imena)').join(', ');
   document.querySelectorAll('[data-ocena]').forEach(el => { el.innerHTML = oceniBtn(el.dataset.ocena, oc[el.dataset.ocena]); });
+  if ($('#opombeAuto')) $('#opombeAuto').textContent = opombeAuto(c);
   if ($('#oddajaKwh')) $('#oddajaKwh').value = m.letno ? Math.round(m.oddaja) : '';
   aside.innerHTML = `
-    <div class="card"><div class="muted small">Naprava</div><div class="big">${m.kwp ? fmtN(m.kwp) + ' kWp' : m.kva ? fmtN(m.kva) + ' kVA' : '—'}</div>
+    <div class="card"><div class="muted small">Naprava</div><div class="big">${c.vrste.d && m.kwp ? fmtN(m.kwp) + ' kWp' : c.vrste.d && m.kva ? fmtN(m.kva) + ' kVA' : m.heeKwh ? fmtN(m.heeKwh) + ' kWh' : '—'}</div>
       <dl class="kv" style="margin-top:8px">
         ${m.kva ? `<dt>Razsmerniki</dt><dd>${fmtN(m.kva)} kVA</dd>` : ''}
         ${m.heeKwh ? `<dt>Hranilnik</dt><dd>${fmtN(m.heeKwh)} kWh, ${fmtN(m.heeP)} kW</dd>` : ''}
@@ -976,7 +989,7 @@ function renderSettings() {
     <p class="small muted" style="margin:8px 0 0">Izbire vpišite z enakim besedilom kot na spletnem obrazcu – pomočnik jih prikaže pri ustreznem polju.</p>
   </section>
   <section style="margin-top:16px"><h2>Predloge e-pošte</h2>
-    <p class="small muted" style="margin-top:0">Spremenljivke: ${['uporabnik', 'naslov', 'lokacija', 'mm', 'naprava', 'distributer', 'st_vloge', 'blok_solastniki', 'blok_manjka', 'izvajalec', 'podpis'].map(v => `<code>{{${v}}}</code>`).join(' ')}.</p>
+    <p class="small muted" style="margin-top:0">Spremenljivke: ${['uporabnik', 'naslov', 'lokacija', 'mm', 'naprava', 'predmet', 'Predmet', 'distributer', 'st_vloge', 'blok_solastniki', 'blok_manjka', 'izvajalec', 'podpis'].map(v => `<code>{{${v}}}</code>`).join(' ')}.</p>
     ${Object.entries(S.templates).map(([key, t]) => `
       <h2 style="margin-top:14px">${esc(t.ime)}</h2>
       <label class="f">Zadeva<input data-s="templates.${key}.zadeva" value="${esc(t.zadeva)}"></label>
@@ -1370,7 +1383,7 @@ async function genPooblastilo(c, oseba) {
   ]);
   W.razdelek('Predmet', 'Obseg pooblastila');
   if (oseba.jeUporabnik) {
-    W.p(`Pooblastitelj pooblašča pooblaščenca, da v njegovem imenu pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj}${mmSt ? ` na merilnem mestu št. ${mmSt}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}` : ''} na lokaciji ${lokacija(c) || '__________________________'} ter v tem postopku:`);
+    W.p(`Pooblastitelj pooblašča pooblaščenca, da v njegovem imenu pri družbi Elektro Maribor, d.d. vloži Enotno vlogo za izdajo soglasja za priključitev ${kaj}${samoHee(c) && c.hr.predhodnoSzp ? ` (dograditev k soglasju št. ${c.hr.predhodnoSzp})` : ''}${mmSt ? ` na merilnem mestu št. ${mmSt}${c.mm.gsrn ? ` (GSRN ${c.mm.gsrn.replace(/\s/g, '')})` : ''}` : ''} na lokaciji ${lokacija(c) || '__________________________'} ter v tem postopku:`);
   } else {
     W.p(`Pooblastitelj kot solastnik spodaj navedenih nepremičnin soglaša s postavitvijo in priključitvijo ${kaj}, ki jo na lokaciji ${lokacija(c) || '__________________________'} postavlja uporabnik ${join([uporabnik(c), naslov(c.im)]) || '__________________________'}, ter pooblašča pooblaščenca, da to soglasje predloži družbi Elektro Maribor, d.d. ob Enotni vlogi za izdajo soglasja za priključitev ter v tem postopku:`);
   }
@@ -1469,7 +1482,8 @@ async function genTehDoc(c) {
       ['Največja moč polnjenja / praznjenja', `${fmtN(m.heeP)} kW / ${fmtN(m.heeO)} kW`],
       ['Priključna shema', OPC.shema[hr.shema]],
       ['Način obratovanja', obrTxt(hr.obr)],
-      ['Vključitev', 'v interno električno inštalacijo objekta za merilnim mestom']
+      ['Vključitev', 'v interno električno inštalacijo objekta za merilnim mestom'],
+      ...(samoHee(c) ? [['Obstoječa naprava', hr.obstojeca], ['Obstoječe soglasje za priključitev', hr.predhodnoSzp]] : [])
     ]);
     W.tabela(['Proizvajalec', 'Model', 'Enot', 'Tehnol.', 'kWh', 'kW polnj.', 'kW prazn.', 'Faze'],
       m.hee.map(h => [h.proizvajalec, h.model, kos(h), OPC.tehnologija[h.tehnologija] || h.tehnologija, fmtN(num(h.kwh)), fmtN(num(h.kwP)), fmtN(num(h.kwO || h.kwP)), h.faze]), [0.16, 0.24, 0.07, 0.1, 0.1, 0.12, 0.12, 0.09]);
